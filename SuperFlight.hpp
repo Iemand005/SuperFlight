@@ -41,9 +41,9 @@ public:
 		const float dt = static_cast<float>(fpsCounter.deltaTime);
 		if (cube_)
 		{
-			cube_->state.rotation.y += 45.0f * dt;
-			cube_->state.rotation.x += 20.0f * dt;
-			cube_->modelMatrixDirty = true;
+			// cube_->state.rotation.y += 45.0f * dt;
+			// cube_->state.rotation.x += 20.0f * dt;
+			// cube_->modelMatrixDirty = true;
 		}
 		Redraw();
 	}
