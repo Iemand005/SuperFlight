@@ -155,6 +155,32 @@ public:
 
 		
 
+		if (droneMode)
+		{
+			const float dt = static_cast<float>(fpsCounter.deltaTime);
+
+			if (window->IsKeyDown(SDL_SCANCODE_LEFT))  camera->yaw -= droneLookSpeed * dt;
+			if (window->IsKeyDown(SDL_SCANCODE_RIGHT)) camera->yaw += droneLookSpeed * dt;
+			if (window->IsKeyDown(SDL_SCANCODE_UP))    camera->pitch += droneLookSpeed * dt;
+			if (window->IsKeyDown(SDL_SCANCODE_DOWN))  camera->pitch -= droneLookSpeed * dt;
+			camera->pitch = std::clamp(camera->pitch, -89.0f, 89.0f);
+			camera->UpdateDirection();
+
+			glm::vec3 front = camera->front;
+			glm::vec3 right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
+			glm::vec3 move(0.0f);
+
+			if (window->IsKeyDown(SDL_SCANCODE_W)) move += front;
+			if (window->IsKeyDown(SDL_SCANCODE_S)) move -= front;
+			if (window->IsKeyDown(SDL_SCANCODE_D)) move += right;
+			if (window->IsKeyDown(SDL_SCANCODE_A)) move -= right;
+			if (window->IsKeyDown(SDL_SCANCODE_SPACE)) move += glm::vec3(0.0f, 1.0f, 0.0f);
+			if (window->IsKeyDown(SDL_SCANCODE_LSHIFT)) move -= glm::vec3(0.0f, 1.0f, 0.0f);
+
+			if (glm::length(move) > 0.0f)
+				camera->SetPos(camera->GetPos() + glm::normalize(move) * droneSpeed * dt);
+		}
+
 		if (window->IsKeyDown(SDL_SCANCODE_ESCAPE))
 			window->StopMouseCapture();
 		if (ImGui::GetIO().WantCaptureMouse)
@@ -167,11 +193,24 @@ public:
 	{
 		if (!showDebugUI) return;
 		BeginFrame();
+
+		ImGui::Begin("SuperFlight");
+		ImGui::Text("Drone Mode: %s", droneMode ? "ON" : "OFF");
+		if (ImGui::Button(droneMode ? "Disable Drone Mode" : "Enable Drone Mode"))
+			droneMode = !droneMode;
+		ImGui::TextDisabled("WASD move, Space up, Shift down, Arrows rotate");
+		ImGui::SliderFloat("Drone Speed", &droneSpeed, 1.0f, 50.0f);
+		ImGui::SliderFloat("Rotate Speed", &droneLookSpeed, 10.0f, 360.0f);
+		ImGui::End();
+
 		DrawDebugUI();
 		EndFrame();
 	}
 
 private:
 	bool showDebugUI = false;
+	bool droneMode = false;
+	float droneSpeed = 8.0f;
+	float droneLookSpeed = 90.0f;
 	std::shared_ptr<fe::Object> cube_;
 };
