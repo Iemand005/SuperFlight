@@ -38,6 +38,7 @@ public:
 
 	void Step() override
 	{
+		ProcessInput();
 		const float dt = static_cast<float>(fpsCounter.deltaTime);
 		if (cube_)
 		{
