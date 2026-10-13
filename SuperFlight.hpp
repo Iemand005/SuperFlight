@@ -18,10 +18,6 @@ public:
 	{
 		SetClearColor(0.05f, 0.07f, 0.12f);
 
-		// Renders with the engine's default Vulkan shaders
-		// (resources/shaders/VertexShader_vk.spv / FragmentShader_vk.spv), which
-		// CMake compiles to SPIR-V and copies next to the executable.
-
 		cube_ = std::make_shared<fe::Object>();
 		cube_->name = "Cube";
 		cube_->color = glm::vec3(1.0f, 0.45f, 0.0f);
