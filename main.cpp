@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
 		fe::LogToFile("Creating SuperFlight game instance...");
 
 		fe::XRGameOptions options(1200, 800);
-		options.useVulkan = false;
+		options.useVulkan = true;
 #ifdef __ANDROID__
 		fe::AndroidSetupAssets("resources");
 		options.launchVR = true;
