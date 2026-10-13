@@ -104,6 +104,7 @@ target_link_libraries(${SUPERFLIGHT_TARGET} PRIVATE X11::X11)
 endif()
 
 if(MSVC)
+	target_compile_options(${SUPERFLIGHT_TARGET} PRIVATE /EHsc)
 	target_link_options(${SUPERFLIGHT_TARGET} PRIVATE $<$<CONFIG:Debug>:/DEBUG>)
 
 	add_compile_options(/RTC1)
