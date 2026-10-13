@@ -5,13 +5,34 @@
 #include <memory>
 #include <string>
 
-#include <glm/glm.hpp>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
-#include <SDL3/SDL.h>
+#include <glm/glm.hpp>
 
 #include <EditableGame.hpp>
 #include <Object.hpp>
 #include <Primitives.hpp>
+
+// Resolve a runtime path against the folder that holds the executable, so the
+// game finds its SPIR-V shaders no matter what working directory it is launched
+// from (engine loads shaders relative to the process working directory).
+static std::string SuperFlightExecutableDir()
+{
+#ifdef _WIN32
+	char buffer[MAX_PATH] = {};
+	const DWORD length = GetModuleFileNameA(nullptr, buffer, MAX_PATH);
+	if (length == 0 || length >= MAX_PATH)
+		return std::string();
+
+	std::string path(buffer, length);
+	const std::string::size_type slash = path.find_last_of("\\/");
+	return slash == std::string::npos ? std::string() : path.substr(0, slash + 1);
+#else
+	return std::string();
+#endif
+}
 
 class SuperFlight : public fe::EditableGame
 {
@@ -20,11 +41,7 @@ public:
 	{
 		SetClearColor(0.05f, 0.07f, 0.12f);
 
-		// The engine resolves shader paths relative to the process working
-		// directory, so resolve them against the executable's own folder to keep
-		// the SPIR-V discoverable however the game is launched.
-		const char* basePath = SDL_GetBasePath();
-		const std::string base = basePath ? basePath : "";
+		const std::string base = SuperFlightExecutableDir();
 		LoadVulkanShaders(base + "resources/shaders/VertexShader_vk.spv",
 			base + "resources/shaders/FragmentShader_vk.spv");
 
