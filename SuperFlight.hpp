@@ -5,34 +5,11 @@
 #include <memory>
 #include <string>
 
-#ifdef _WIN32
-#include <windows.h>
-#endif
-
 #include <glm/glm.hpp>
 
 #include <EditableGame.hpp>
 #include <Object.hpp>
 #include <Primitives.hpp>
-
-// Resolve a runtime path against the folder that holds the executable, so the
-// game finds its SPIR-V shaders no matter what working directory it is launched
-// from (engine loads shaders relative to the process working directory).
-static std::string SuperFlightExecutableDir()
-{
-#ifdef _WIN32
-	char buffer[MAX_PATH] = {};
-	const DWORD length = GetModuleFileNameA(nullptr, buffer, MAX_PATH);
-	if (length == 0 || length >= MAX_PATH)
-		return std::string();
-
-	std::string path(buffer, length);
-	const std::string::size_type slash = path.find_last_of("\\/");
-	return slash == std::string::npos ? std::string() : path.substr(0, slash + 1);
-#else
-	return std::string();
-#endif
-}
 
 class SuperFlight : public fe::EditableGame
 {
@@ -41,9 +18,9 @@ public:
 	{
 		SetClearColor(0.05f, 0.07f, 0.12f);
 
-		const std::string base = SuperFlightExecutableDir();
-		LoadVulkanShaders(base + "resources/shaders/VertexShader_vk.spv",
-			base + "resources/shaders/FragmentShader_vk.spv");
+		// Renders with the engine's default Vulkan shaders
+		// (resources/shaders/VertexShader_vk.spv / FragmentShader_vk.spv), which
+		// CMake compiles to SPIR-V and copies next to the executable.
 
 		cube_ = std::make_shared<fe::Object>();
 		cube_->name = "Cube";
