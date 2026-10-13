@@ -48,6 +48,118 @@ public:
 		Redraw();
 	}
 
+	void ProcessInput()
+	{
+		SDL_Event event;
+		fe::SDLWindow *window = GetWindow<fe::SDLWindow>();
+		while (window->PollSDLEvent(&event))
+		{
+			ImGui_ImplSDL3_ProcessEvent(&event);
+			auto io = ImGui::GetIO();
+			switch (event.type)
+			{
+			case SDL_EVENT_QUIT:
+				window->PrepareClose();
+				break;
+			case SDL_EVENT_MOUSE_BUTTON_DOWN:
+				if (event.button.which == SDL_TOUCH_MOUSEID)
+					break; // touch handles its own events below
+				if (event.button.button == SDL_BUTTON_LEFT && !io.WantCaptureMouse)
+				{
+					window->StartMouseCapture();
+					RefreshJoysticks();
+				}
+				if (window->IsCapturingMouse())
+				{
+					// if (event.button.button == SDL_BUTTON_LEFT)
+					// 	PlaceBlock(true);
+					// else if (event.button.button == SDL_BUTTON_RIGHT)
+					// 	PlaceBlock(false);
+				}
+				break;
+			case SDL_EVENT_WINDOW_RESIZED:
+			case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+				Redraw();
+				break;
+			case SDL_EVENT_MOUSE_MOTION:
+			{
+				if (event.motion.which == SDL_TOUCH_MOUSEID)
+					break; // touch looks around via SDL_EVENT_FINGER_MOTION
+				if (!window->IsCapturingMouse())
+					break;
+				float sensitivity = 0.1f;
+				camera->yaw += event.motion.xrel * sensitivity;
+				camera->pitch -= event.motion.yrel * sensitivity;
+				camera->UpdateDirection();
+				camera->pitch = std::clamp(camera->pitch, -89.0f, 89.0f);
+				break;
+			}
+			case SDL_EVENT_FINGER_DOWN:
+			{
+				if (event.tfinger.fingerID != 0)
+					break; // only the primary finger drives look/capture
+				if (!io.WantCaptureMouse)
+				{
+					if (!window->IsCapturingMouse())
+					{
+						window->StartMouseCapture();
+						RefreshJoysticks();
+					}
+					else
+					{
+						// PlaceBlock(true);
+					}
+				}
+				break;
+			}
+			case SDL_EVENT_FINGER_MOTION:
+			{
+				if (event.tfinger.fingerID != 0)
+					break;
+				if (!window->IsCapturingMouse())
+					break;
+				float sensitivity = 0.1f;
+				camera->yaw += event.tfinger.dx * window->width * sensitivity;
+				camera->pitch -= event.tfinger.dy * window->height * sensitivity;
+				camera->UpdateDirection();
+				camera->pitch = std::clamp(camera->pitch, -89.0f, 89.0f);
+				break;
+			}
+			case SDL_EVENT_FINGER_UP:
+				if (event.tfinger.fingerID == 0 && !io.WantCaptureMouse)
+					window->StopMouseCapture();
+				break;
+			case SDL_EVENT_KEY_DOWN:
+				if (event.key.key == SDLK_F11)
+				{
+					window->ToggleFullscreen();
+				}
+				else if (event.key.key == SDLK_F3)
+				{
+					// showDebugUI = !showDebugUI;
+				}
+				else if (event.key.key == SDLK_F2)
+				{
+					// freeCamera = !freeCamera;
+					window->StartMouseCapture();
+					RefreshJoysticks();
+				}
+				else if (event.key.key == SDLK_F4)
+				{
+					ToggleXR();
+				}
+				break;
+			}
+		}
+
+		
+
+		if (window->IsKeyDown(SDL_SCANCODE_ESCAPE))
+			window->StopMouseCapture();
+		if (ImGui::GetIO().WantCaptureMouse)
+			window->StopMouseCapture();
+	}
+
 	void InitUI() override {}
 
 	void DrawUI() override
