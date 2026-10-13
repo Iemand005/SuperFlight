@@ -21,7 +21,7 @@ public:
 		cube_ = std::make_shared<fe::Object>();
 		cube_->name = "Cube";
 		cube_->color = glm::vec3(1.0f, 0.45f, 0.0f);
-		cube_->PushMesh(fe::Primitives::GenerateCube(2.0f));
+		cube_->PushMesh(fe::Primitives::GeneratePlane(2.0f, 2.0f));
 		scene->AddObject(cube_);
 
 		camera->SetPos(glm::vec3(0.0f, 1.5f, 6.0f));
