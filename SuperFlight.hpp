@@ -21,7 +21,7 @@ public:
 		cube_ = std::make_shared<fe::Object>();
 		cube_->name = "Cube";
 		cube_->color = glm::vec3(1.0f, 0.45f, 0.0f);
-		cube_->PushMesh(fe::Primitives::GeneratePlane(2.0f, 2.0f));
+		cube_->PushMesh(fe::Primitives::GeneratePlane(10.0f, 10.0f));
 		scene->AddObject(cube_);
 
 		camera->SetPos(glm::vec3(0.0f, 1.5f, 6.0f));
@@ -137,7 +137,7 @@ public:
 				}
 				else if (event.key.key == SDLK_F3)
 				{
-					// showDebugUI = !showDebugUI;
+					showDebugUI = !showDebugUI;
 				}
 				else if (event.key.key == SDLK_F2)
 				{
@@ -165,10 +165,13 @@ public:
 
 	void DrawUI() override
 	{
+		if (!showDebugUI) return;
 		BeginFrame();
+		DrawDebugUI();
 		EndFrame();
 	}
 
 private:
+	bool showDebugUI = false;
 	std::shared_ptr<fe::Object> cube_;
 };
