@@ -87,6 +87,13 @@ target_link_libraries(${SUPERFLIGHT_TARGET} PRIVATE
 	Engine
 )
 
+# The Engine defines FE_HAS_VULKAN inside its own directory, so those defines do
+# not reach this sibling target. SuperFlight renders through the Vulkan backend,
+# so its translation units (engine inline headers) must see the same define.
+if(NOT ANDROID AND NOT EMSCRIPTEN AND NOT FE_EXCLUDE_VULKAN)
+	target_compile_definitions(${SUPERFLIGHT_TARGET} PRIVATE FE_HAS_VULKAN)
+endif()
+
 target_precompile_headers(${SUPERFLIGHT_TARGET} PRIVATE
 	"$<$<COMPILE_LANGUAGE:CXX>:${ENGINE_DIR}/src/Engine/pch.hpp>"
 )
@@ -110,4 +117,70 @@ if(MSVC)
 	add_compile_options(/RTC1)
 endif()
 
-set_property(TARGET ${SUPERFLIGHT_TARGET} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_property(TARGET ${SUPERFLIGHT_TARGET} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+
+# ---------------------------------------------------------------
+# Vulkan runtime resources + GLSL -> SPIR-V shader compilation
+# ---------------------------------------------------------------
+if(NOT ANDROID)
+	set(RESOURCE_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/resources)
+	set(RESOURCE_OUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/resources)
+
+	add_custom_target(CopyResources_SuperFlight ALL
+		COMMAND ${CMAKE_COMMAND} -E copy_directory ${RESOURCE_SRC_DIR} ${RESOURCE_OUT_DIR}
+		COMMENT "Copying SuperFlight resources to ${RESOURCE_OUT_DIR}"
+	)
+
+	find_program(GLSLC glslc HINTS
+		$ENV{VULKAN_SDK}/Bin
+		$ENV{VULKAN_SDK}/bin
+	)
+
+	if(GLSLC)
+		message(STATUS "Found glslc: ${GLSLC}")
+
+		set(SHADER_SRC_DIR ${RESOURCE_SRC_DIR}/shaders)
+		set(SHADER_OUT_DIR ${RESOURCE_OUT_DIR}/shaders)
+		file(MAKE_DIRECTORY ${SHADER_OUT_DIR})
+
+		set(SHADER_SOURCES
+			${SHADER_SRC_DIR}/VertexShader_vk.glsl
+			${SHADER_SRC_DIR}/FragmentShader_vk.glsl
+		)
+
+		foreach(SHADER ${SHADER_SOURCES})
+			get_filename_component(SHADER_NAME ${SHADER} NAME_WE)
+
+			if(${SHADER_NAME} MATCHES ".*Fragment.*")
+				set(SHADER_STAGE frag)
+			else()
+				set(SHADER_STAGE vert)
+			endif()
+
+			set(SPIRV_OUTPUT ${SHADER_OUT_DIR}/${SHADER_NAME}.spv)
+
+			add_custom_command(
+				OUTPUT ${SPIRV_OUTPUT}
+				COMMAND ${GLSLC} -fshader-stage=${SHADER_STAGE} --target-env=vulkan1.0 -DFE_VULKAN ${SHADER} -o ${SPIRV_OUTPUT}
+				DEPENDS ${SHADER}
+				COMMENT "Compiling ${SHADER_NAME} -> ${SHADER_NAME}.spv"
+				VERBATIM
+			)
+
+			list(APPEND SPIRV_OUTPUTS ${SPIRV_OUTPUT})
+		endforeach()
+
+		add_custom_target(SPIRV_ShadersSuperFlight ALL DEPENDS ${SPIRV_OUTPUTS})
+		add_dependencies(SPIRV_ShadersSuperFlight CopyResources_SuperFlight)
+		add_dependencies(${SUPERFLIGHT_TARGET} SPIRV_ShadersSuperFlight)
+	else()
+		message(WARNING "glslc not found - SuperFlight shader compilation skipped. Set VULKAN_SDK environment variable.")
+	endif()
+
+	# Keep resources next to the executable too, so SDL_GetBasePath() resolves the
+	# SPIR-V regardless of the launcher's working directory (VS, VS Code, exe).
+	add_custom_command(TARGET ${SUPERFLIGHT_TARGET} POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_directory ${RESOURCE_OUT_DIR} $<TARGET_FILE_DIR:${SUPERFLIGHT_TARGET}>/resources
+		COMMENT "Copying SuperFlight resources next to the executable"
+	)
+endif()
