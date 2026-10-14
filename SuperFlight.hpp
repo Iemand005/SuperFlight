@@ -87,6 +87,12 @@ public:
 
 		Update();
 
+		if (smokeBox_ && smokeFrame_ < 260)
+		{
+			std::cout << "[SMOKE] frame " << smokeFrame_ << " y=" << smokeBox_->GetPosition().y << " vy=" << smokeBox_->GetLinearVelocity().y << std::endl;
+			++smokeFrame_;
+		}
+
 		switch (mode)
 		{
 		case Mode::Walking:  RespawnIfFell(); SyncCameraToPlayer(); break;
@@ -113,6 +119,17 @@ public:
 
 		CreatePlayer();
 		CreateParkedVehicles();
+
+		if (auto *physics = GetPhysicsFactory())
+		{
+			smokeBox_ = physics->CreateObject(glm::vec3(1.0f, 1.0f, 1.0f), true, true);
+			if (smokeBox_)
+			{
+				smokeBox_->SetPosition(glm::vec3(0.0f, 45.0f, 0.0f));
+				smokeBox_->SetDamping(0.0f, 0.0f);
+				smokeBox_->SetLinearVelocity(glm::vec3(0.0f));
+			}
+		}
 	}
 
 	void RebuildPlayerPhysicsBody()
@@ -962,4 +979,7 @@ private:
 	fe::Object *airplaneGearObject_ = nullptr;
 	fe::PhysicsVehicle *airplaneVehicle_ = nullptr;
 	bool airplaneGearDown = true;
+
+	std::unique_ptr<fe::PhysicsObject> smokeBox_;
+	int smokeFrame_ = 0;
 };
