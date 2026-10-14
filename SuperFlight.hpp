@@ -87,11 +87,12 @@ public:
 
 		Update();
 
-		if (stepFrame_ == 200 && !smokeBox_)
-			SpawnSmokeBox();
-		if (smokeBox_ && smokeFrame_ < 200)
+		if (stepFrame_ == 200 && mode == Mode::Walking)
+			EnterAirplane();
+		if (smokeFrame_ < 200 && mode == Mode::Airplane && airplaneBody_)
 		{
-			std::cout << "[SMOKE] frame " << smokeFrame_ << " boxY=" << smokeBox_->GetPosition().y
+			std::cout << "[SMOKE] frame " << smokeFrame_ << " planeY=" << airplaneBody_->GetPosition().y
+					  << " gearDown=" << airplaneGearDown
 					  << " playerY=" << (player && player->physicsCharacter ? player->physicsCharacter->GetPosition().y : -999.0f)
 					  << std::endl;
 			++smokeFrame_;
