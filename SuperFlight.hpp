@@ -151,12 +151,11 @@ public:
 	void CreateParkedVehicles()
 	{
 		// Parked drone: a plain cube, static until the player climbs in.
-		auto droneMesh = fe::Primitives::GenerateCube(
+		droneObject_ = std::make_shared<fe::Object>(fe::Primitives::GenerateCube(
 			{fe::PlaneDirection::Front, fe::PlaneDirection::Back,
 			 fe::PlaneDirection::Left, fe::PlaneDirection::Right,
 			 fe::PlaneDirection::Top, fe::PlaneDirection::Bottom},
-			0.6f);
-		droneObject_ = std::make_shared<fe::Object>(droneMesh);
+			0.6f));
 		droneObject_->name = "Drone";
 		droneObject_->color = glm::vec3(1.0f, 0.45f, 0.0f);
 		droneObject_->state.position = droneSpawn;
