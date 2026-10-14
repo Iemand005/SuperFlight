@@ -374,8 +374,31 @@ public:
 		droneBody_->AddForce(force);
 	}
 
+	void AirplaneDriveUpdate(fe::SDLWindow *window)
+	{
+		float forward = 0.0f, steer = 0.0f, brake = 0.0f, handbrake = 0.0f;
+		if (window->IsKeyDown(SDL_SCANCODE_W)) forward += 1.0f;
+		if (window->IsKeyDown(SDL_SCANCODE_S)) forward -= 0.5f; // reverse
+		if (window->IsKeyDown(SDL_SCANCODE_D)) steer += 1.0f;
+		if (window->IsKeyDown(SDL_SCANCODE_A)) steer -= 1.0f;
+		if (window->IsKeyDown(SDL_SCANCODE_SPACE)) handbrake = 1.0f;
+		if (window->IsKeyDown(SDL_SCANCODE_LSHIFT)) brake = 1.0f;
+
+		airplaneVehicle_->SetDriverInput(forward, steer, brake, handbrake);
+		airplaneThrottle = forward > 0.0f ? forward : 0.0f;
+		airplaneAirSpeed = glm::length(airplaneBody_->GetLinearVelocity());
+	}
+
 	void AirplaneUpdate(fe::SDLWindow *window, float dt)
 	{
+		// On the wheels the Jolt vehicle controller drives the plane; retract the
+		// gear (G) to hand control over to the aerodynamic flight model below.
+		if (airplaneGearDown && airplaneVehicle_)
+		{
+			AirplaneDriveUpdate(window);
+			return;
+		}
+
 		airplaneBody_->SetDamping(0.0f, 0.0f);
 
 		float throttleInput = 0.0f;
@@ -395,7 +418,7 @@ public:
 		glm::quat rot = airplaneBody_->GetRotation();
 		glm::vec3 right = rot * glm::vec3(1.0f, 0.0f, 0.0f);
 		glm::vec3 up    = rot * glm::vec3(0.0f, 1.0f, 0.0f);
-		glm::vec3 fwd   = rot * glm::vec3(0.0f, 0.0f, -1.0f);
+		glm::vec3 fwd   = rot * glm::vec3(0.0f, 0.0f, 1.0f);
 
 		// Rate-based yoke: input commands an angular velocity around the body axes.
 		glm::vec3 omega(0.0f);
@@ -429,7 +452,7 @@ public:
 	{
 		glm::quat rot = airplaneBody_->GetRotation();
 		glm::vec3 pos = airplaneBody_->GetPosition();
-		glm::vec3 fwd = rot * glm::vec3(0.0f, 0.0f, -1.0f);
+		glm::vec3 fwd = rot * glm::vec3(0.0f, 0.0f, 1.0f);
 		glm::vec3 up  = rot * glm::vec3(0.0f, 1.0f, 0.0f);
 
 		if (airplaneChaseCam)
@@ -662,6 +685,11 @@ public:
 					if (mode != Mode::Walking)
 						ExitVehicle();
 				}
+				else if (event.key.key == SDLK_G)
+				{
+					if (mode == Mode::Airplane)
+						SetAirplaneGear(!airplaneGearDown);
+				}
 				break;
 			}
 		}
@@ -689,17 +717,17 @@ public:
 				indices.push_back(base + i);
 		};
 
-		// Local forward is -Z (matches the camera's -Z convention), so the nose
-		// and tail are mirrored on Z relative to a naive layout.
+		// Local forward is +Z (matches Jolt's default wheel forward axis so the
+		// plane drives toward its nose). Tail surfaces sit on -Z.
 		addBox({0.0f, 0.0f, 0.0f},     {0.25f, 0.25f, 1.6f});  // fuselage
-		addBox({0.0f, 0.0f, -0.2f},    {1.8f, 0.06f, 0.4f});   // main wings
-		addBox({0.0f, 0.0f, 1.4f},     {0.6f, 0.05f, 0.25f});  // horizontal stabilizer
-		addBox({0.0f, 0.35f, 1.4f},    {0.05f, 0.35f, 0.3f});  // vertical fin
+		addBox({0.0f, 0.0f, 0.2f},     {1.8f, 0.06f, 0.4f});   // main wings
+		addBox({0.0f, 0.0f, -1.4f},    {0.6f, 0.05f, 0.25f});  // horizontal stabilizer
+		addBox({0.0f, 0.35f, -1.4f},   {0.05f, 0.35f, 0.3f});  // vertical fin
 
 		return fe::Mesh<fe::Vertex>(vertices, indices);
 	}
 
-	// Tricycle landing gear drawn in body-local space (nose at -Z). Kept as a
+	// Tricycle landing gear drawn in body-local space (nose at +Z). Kept as a
 	// separate object so it can be hidden when the gear is retracted.
 	static fe::Mesh<fe::Vertex> BuildAirplaneGearMesh()
 	{
@@ -718,12 +746,12 @@ public:
 				indices.push_back(base + i);
 		};
 
-		addBox({0.0f, -0.45f, -1.1f}, {0.06f, 0.30f, 0.06f}); // nose strut
-		addBox({0.0f, -0.72f, -1.1f}, {0.10f, 0.10f, 0.22f}); // nose wheel
-		addBox({-0.6f, -0.45f, 0.3f}, {0.06f, 0.30f, 0.06f}); // left strut
-		addBox({-0.6f, -0.72f, 0.3f}, {0.10f, 0.10f, 0.22f}); // left wheel
-		addBox({0.6f, -0.45f, 0.3f},  {0.06f, 0.30f, 0.06f}); // right strut
-		addBox({0.6f, -0.72f, 0.3f},  {0.10f, 0.10f, 0.22f}); // right wheel
+		addBox({0.0f, -0.45f, 1.1f},  {0.06f, 0.30f, 0.06f}); // nose strut
+		addBox({0.0f, -0.72f, 1.1f},  {0.10f, 0.10f, 0.22f}); // nose wheel
+		addBox({-0.6f, -0.45f, -0.3f}, {0.06f, 0.30f, 0.06f}); // left strut
+		addBox({-0.6f, -0.72f, -0.3f}, {0.10f, 0.10f, 0.22f}); // left wheel
+		addBox({0.6f, -0.45f, -0.3f},  {0.06f, 0.30f, 0.06f}); // right strut
+		addBox({0.6f, -0.72f, -0.3f},  {0.10f, 0.10f, 0.22f}); // right wheel
 
 		return fe::Mesh<fe::Vertex>(vertices, indices);
 	}
@@ -746,9 +774,9 @@ public:
 			w.isDriven = driven;
 			return w;
 		};
-		wheels.push_back(wheel({0.0f, -0.45f, -1.1f}, 0.22f, true, false));  // nose
-		wheels.push_back(wheel({-0.6f, -0.45f, 0.3f}, 0.28f, false, true));  // left
-		wheels.push_back(wheel({0.6f, -0.45f, 0.3f}, 0.28f, false, true));   // right
+		wheels.push_back(wheel({0.0f, -0.45f, 1.1f}, 0.22f, true, false));   // nose
+		wheels.push_back(wheel({-0.6f, -0.45f, -0.3f}, 0.28f, false, true));  // left
+		wheels.push_back(wheel({0.6f, -0.45f, -0.3f}, 0.28f, false, true));   // right
 		return wheels;
 	}
 
@@ -759,8 +787,7 @@ public:
 			return;
 		if (airplaneVehicle_)
 			return;
-		// Forward is the plane's nose (-Z) so steering/driving match the visuals.
-		airplaneVehicle_ = physics->CreateVehicle(airplaneBody_, BuildAirplaneWheels(), glm::vec3(0.0f, 0.0f, -1.0f));
+		airplaneVehicle_ = physics->CreateVehicle(airplaneBody_, BuildAirplaneWheels());
 		if (airplaneVehicle_)
 			airplaneVehicle_->SetMaxPitchRollAngle(45.0f);
 	}
@@ -832,8 +859,17 @@ public:
 
 		if (ImGui::CollapsingHeader("Airplane", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			ImGui::TextDisabled("W/S pitch, A/D roll, Q/E yaw rudder");
-			ImGui::TextDisabled("Shift throttle up, Ctrl throttle down, Space level out");
+			ImGui::Text("Gear: %s  (%s)", airplaneGearDown ? "DOWN" : "UP",
+				airplaneGearDown ? "taxi/vehicle mode" : "flight mode");
+			if (ImGui::Button(airplaneGearDown ? "Retract gear (G)" : "Extend gear (G)"))
+				SetAirplaneGear(!airplaneGearDown);
+			if (airplaneGearDown)
+				ImGui::TextDisabled("W throttle, S reverse, A/D steer, Shift brake, Space handbrake");
+			else
+			{
+				ImGui::TextDisabled("W/S pitch, A/D roll, Q/E yaw rudder");
+				ImGui::TextDisabled("Shift throttle up, Ctrl throttle down, Space level out");
+			}
 			ImGui::Checkbox("Chase camera", &airplaneChaseCam);
 			ImGui::Checkbox("Invert pitch", &airplaneInvertPitch);
 			ImGui::Text("Throttle: %.0f%%", airplaneThrottle * 100.0f);
