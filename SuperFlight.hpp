@@ -478,6 +478,7 @@ public:
 private:
 	bool showDebugUI = false;
 	bool droneMode = false;
+	bool airplaneMode = false;
 
 	float droneThrust = 30.0f;
 	float droneLift = 18.0f;
@@ -500,4 +501,24 @@ private:
 
 	std::shared_ptr<fe::Object> droneObject_;
 	fe::PhysicsObject* droneBody_ = nullptr;
+
+	float airplaneThrottle = 0.0f;
+	float airplaneAirSpeed = 0.0f;
+	float airplaneMaxSpeed = 90.0f;
+	float airplaneAccel = 6.0f;
+	float airplaneThrottleRate = 1.5f;
+	float airplanePitchRate = 60.0f;
+	float airplaneRollRate = 120.0f;
+	float airplaneYawRate = 45.0f;
+	float airplaneGravitySag = 8.0f;
+	float airplaneStallSpeed = 25.0f;
+	float airplaneLevelStrength = 4.0f;
+	float airplaneCamDistance = 12.0f;
+	float airplaneCamHeight = 4.0f;
+	glm::vec2 airplaneCockpitOffset{0.6f, 0.4f};
+	bool airplaneInvertPitch = false;
+	bool airplaneChaseCam = true;
+
+	std::shared_ptr<fe::Object> airplaneObject_;
+	fe::PhysicsObject* airplaneBody_ = nullptr;
 };
