@@ -31,7 +31,7 @@ public:
 			LoadFoxcraftShaders("resources/shaders/VertexShader_vk_foxcraft.spv", "resources/shaders/FragmentShader_vk_array.spv");
 			chunkBatcher_ = std::make_unique<ChunkBatcher>(
 				static_cast<fe::VulkanDevice *>(renderDevice.get()),
-				ChunkMesher::BlockTextures());
+				ChunkMesher::BuildBlockTextureImages());
 			chunkManager->SetBatcher(chunkBatcher_.get());
 			chunkManager->SetUseBatcherPath(true);
 		}

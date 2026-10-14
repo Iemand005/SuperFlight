@@ -185,4 +185,16 @@ if(NOT ANDROID)
 		COMMAND ${CMAKE_COMMAND} -E copy_directory ${RESOURCE_OUT_DIR} $<TARGET_FILE_DIR:${SUPERFLIGHT_TARGET}>/resources
 		COMMENT "Copying SuperFlight resources next to the executable"
 	)
+
+	# The shared voxel block textures live in the repo-root Assets folder. Copy
+	# them next to the executable so ChunkMesher::BuildBlockTextureImages() can
+	# resolve "Assets/Grass.png" via ImageLoader's executable-directory fallback
+	# regardless of the working directory.
+	set(ASSETS_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../Assets)
+	if(EXISTS ${ASSETS_SRC_DIR})
+		add_custom_command(TARGET ${SUPERFLIGHT_TARGET} POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_directory ${ASSETS_SRC_DIR} $<TARGET_FILE_DIR:${SUPERFLIGHT_TARGET}>/Assets
+			COMMENT "Copying shared Assets next to the executable"
+		)
+	endif()
 endif()
