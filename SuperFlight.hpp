@@ -87,6 +87,8 @@ public:
 
 		Update();
 
+		if (stepFrame_ == 200 && !smokeBox_)
+			SpawnSmokeBox();
 		if (smokeBox_ && smokeFrame_ < 200)
 		{
 			std::cout << "[SMOKE] frame " << smokeFrame_ << " boxY=" << smokeBox_->GetPosition().y
@@ -94,6 +96,7 @@ public:
 					  << std::endl;
 			++smokeFrame_;
 		}
+		++stepFrame_;
 
 		switch (mode)
 		{
@@ -988,4 +991,5 @@ private:
 	std::unique_ptr<fe::PhysicsObject> smokeBox_;
 	std::unique_ptr<fe::PhysicsObject> smokePlatform_;
 	int smokeFrame_ = 0;
+	int stepFrame_ = 0;
 };
