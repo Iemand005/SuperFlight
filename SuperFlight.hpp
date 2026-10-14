@@ -87,17 +87,7 @@ public:
 
 		Update();
 
-		if (stepFrame_ == 200 && mode == Mode::Walking)
-			EnterAirplane();
-		if (smokeFrame_ < 200 && mode == Mode::Airplane && airplaneBody_)
-		{
-			std::cout << "[SMOKE] frame " << smokeFrame_ << " planeY=" << airplaneBody_->GetPosition().y
-					  << " gearDown=" << airplaneGearDown
-					  << " playerY=" << (player && player->physicsCharacter ? player->physicsCharacter->GetPosition().y : -999.0f)
-					  << std::endl;
-			++smokeFrame_;
-		}
-		++stepFrame_;
+
 
 		switch (mode)
 		{
@@ -125,20 +115,6 @@ public:
 
 		CreatePlayer();
 		CreateParkedVehicles();
-	}
-
-	void SpawnSmokeBox()
-	{
-		auto *physics = GetPhysicsFactory();
-		if (!physics)
-			return;
-		smokeBox_ = physics->CreateObject(glm::vec3(1.0f, 1.0f, 1.0f), true, true);
-		if (smokeBox_)
-		{
-			smokeBox_->SetPosition(glm::vec3(16.0f, 45.0f, 6.0f));
-			smokeBox_->SetDamping(0.0f, 0.0f);
-			smokeBox_->SetLinearVelocity(glm::vec3(0.0f));
-		}
 	}
 
 	void RebuildPlayerPhysicsBody()
@@ -989,8 +965,5 @@ private:
 	fe::PhysicsVehicle *airplaneVehicle_ = nullptr;
 	bool airplaneGearDown = true;
 
-	std::unique_ptr<fe::PhysicsObject> smokeBox_;
-	std::unique_ptr<fe::PhysicsObject> smokePlatform_;
-	int smokeFrame_ = 0;
-	int stepFrame_ = 0;
+
 };
