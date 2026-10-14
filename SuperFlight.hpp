@@ -59,6 +59,12 @@ public:
 			DroneUpdate(GetWindow<fe::SDLWindow>(), dt);
 
 		UpdateLoadedChunks();
+
+		{
+			glm::vec2 forward2D = glm::normalize(glm::vec2(camera->front.x, camera->front.z));
+			chunkManager->UpdatePausedState(playerCenter_, forward2D);
+		}
+
 		chunkManager->Update(1, GetPhysicsFactory(), scene.get(),
 							 playerCenter_, chunkLoadDistance, physicsDistance);
 
@@ -78,7 +84,8 @@ public:
 		playerCenter_ = {chunkX, chunkZ};
 
 		int terrainDist = chunkLoadDistance + chunkOutgenDistance;
-		chunkManager->LoadChunksInsideRange(playerCenter_, terrainDist);
+		glm::vec2 forward2D = glm::normalize(glm::vec2(camera->front.x, camera->front.z));
+		chunkManager->LoadChunksInsideRange(playerCenter_, terrainDist, forward2D);
 		chunkManager->UnloadChunksOutsideRange(playerCenter_, terrainDist);
 	}
 
@@ -285,6 +292,11 @@ public:
 			ImGui::Text("Speed: %.1f m/s", glm::length(v));
 			ImGui::Text("Velocity: %.2f, %.2f, %.2f", v.x, v.y, v.z);
 		}
+		ImGui::Separator();
+		ImGui::Text("Terrain");
+		ImGui::DragInt("Render Distance", &chunkLoadDistance);
+		ImGui::DragInt("Physics Distance", &physicsDistance, 0.5f, 0, 20);
+		ImGui::SliderInt("Terrain Pre-gen", &chunkOutgenDistance, 1, 10);
 		ImGui::End();
 
 		DrawDebugUI();
