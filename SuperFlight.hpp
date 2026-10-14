@@ -17,6 +17,7 @@
 #include <Object.hpp>
 #include <Character.hpp>
 #include <Primitives.hpp>
+#include <physics/PhysicsVehicle.hpp>
 
 #include "ChunkManager.hpp"
 #ifdef FE_HAS_VULKAN
@@ -169,6 +170,12 @@ public:
 		airplaneObject_->state.position = airplaneSpawn;
 		airplaneObject_->isStatic = true;
 		scene->AddObject(airplaneObject_);
+
+		auto gear = std::make_unique<fe::Object>(BuildAirplaneGearMesh());
+		gear->name = "AirplaneGear";
+		gear->color = glm::vec3(0.15f, 0.15f, 0.17f);
+		gear->visible = airplaneGearDown;
+		airplaneGearObject_ = airplaneObject_->AddChild(std::move(gear));
 	}
 
 	// ------------------------------------------------------------ vehicle I/O
@@ -227,6 +234,8 @@ public:
 		mode = Mode::Airplane;
 		airplaneThrottle = 0.0f;
 		airplaneAirSpeed = 0.0f;
+		airplaneGearDown = false;   // force SetAirplaneGear to actually apply
+		SetAirplaneGear(true);      // start on the wheels, ready to taxi
 		GetWindow<fe::SDLWindow>()->StartMouseCapture();
 	}
 
@@ -243,8 +252,12 @@ public:
 		else if (mode == Mode::Airplane && airplaneObject_)
 		{
 			vehicle = airplaneObject_.get();
+			DestroyAirplaneVehicle();
 			airplaneObject_->SetPhysicsObject(nullptr);
 			airplaneBody_ = nullptr;
+			airplaneGearDown = true; // parked plane shows its gear again
+			if (airplaneGearObject_)
+				airplaneGearObject_->visible = true;
 		}
 
 		if (vehicle)
@@ -686,6 +699,103 @@ public:
 		return fe::Mesh<fe::Vertex>(vertices, indices);
 	}
 
+	// Tricycle landing gear drawn in body-local space (nose at -Z). Kept as a
+	// separate object so it can be hidden when the gear is retracted.
+	static fe::Mesh<fe::Vertex> BuildAirplaneGearMesh()
+	{
+		std::vector<fe::Vertex> vertices;
+		std::vector<uint32_t> indices;
+		auto addBox = [&](glm::vec3 center, glm::vec3 half)
+		{
+			auto cube = fe::Primitives::GenerateCube(1.0f);
+			uint32_t base = static_cast<uint32_t>(vertices.size());
+			for (auto& v : cube.vertices)
+			{
+				v.position = center + v.position * (half * 2.0f);
+				vertices.push_back(v);
+			}
+			for (auto i : cube.indices)
+				indices.push_back(base + i);
+		};
+
+		addBox({0.0f, -0.45f, -1.1f}, {0.06f, 0.30f, 0.06f}); // nose strut
+		addBox({0.0f, -0.72f, -1.1f}, {0.10f, 0.10f, 0.22f}); // nose wheel
+		addBox({-0.6f, -0.45f, 0.3f}, {0.06f, 0.30f, 0.06f}); // left strut
+		addBox({-0.6f, -0.72f, 0.3f}, {0.10f, 0.10f, 0.22f}); // left wheel
+		addBox({0.6f, -0.45f, 0.3f},  {0.06f, 0.30f, 0.06f}); // right strut
+		addBox({0.6f, -0.72f, 0.3f},  {0.10f, 0.10f, 0.22f}); // right wheel
+
+		return fe::Mesh<fe::Vertex>(vertices, indices);
+	}
+
+	// Wheels line up with the landing gear above. Nose wheel steers, the two
+	// rear wheels drive (first two driven wheels form the differential).
+	static std::vector<fe::PhysicsVehicle::WheelConfig> BuildAirplaneWheels()
+	{
+		std::vector<fe::PhysicsVehicle::WheelConfig> wheels;
+		auto wheel = [](glm::vec3 pos, float radius, bool steer, bool driven)
+		{
+			fe::PhysicsVehicle::WheelConfig w;
+			w.position = pos;
+			w.radius = radius;
+			w.width = 0.2f;
+			w.suspensionMaxLength = 0.3f;
+			w.suspensionFrequency = 1.5f;
+			w.suspensionDamping = 0.5f;
+			w.isSteering = steer;
+			w.isDriven = driven;
+			return w;
+		};
+		wheels.push_back(wheel({0.0f, -0.45f, -1.1f}, 0.22f, true, false));  // nose
+		wheels.push_back(wheel({-0.6f, -0.45f, 0.3f}, 0.28f, false, true));  // left
+		wheels.push_back(wheel({0.6f, -0.45f, 0.3f}, 0.28f, false, true));   // right
+		return wheels;
+	}
+
+	void CreateAirplaneVehicle()
+	{
+		auto *physics = GetPhysicsFactory();
+		if (!physics || !airplaneBody_)
+			return;
+		if (airplaneVehicle_)
+			return;
+		// Forward is the plane's nose (-Z) so steering/driving match the visuals.
+		airplaneVehicle_ = physics->CreateVehicle(airplaneBody_, BuildAirplaneWheels(), glm::vec3(0.0f, 0.0f, -1.0f));
+		if (airplaneVehicle_)
+			airplaneVehicle_->SetMaxPitchRollAngle(45.0f);
+	}
+
+	void DestroyAirplaneVehicle()
+	{
+		if (!airplaneVehicle_)
+			return;
+		if (auto *physics = GetPhysicsFactory())
+			physics->DestroyVehicle(airplaneVehicle_);
+		airplaneVehicle_ = nullptr;
+	}
+
+	void SetAirplaneGear(bool down)
+	{
+		if (down == airplaneGearDown)
+			return;
+		airplaneGearDown = down;
+		if (airplaneGearObject_)
+			airplaneGearObject_->visible = down;
+
+		if (down)
+		{
+			CreateAirplaneVehicle();
+		}
+		else
+		{
+			// Switching from taxiing to flight: seed the airspeed from whatever
+			// ground speed we have so the plane does not stop dead.
+			if (airplaneBody_)
+				airplaneAirSpeed = glm::length(airplaneBody_->GetLinearVelocity());
+			DestroyAirplaneVehicle();
+		}
+	}
+
 	void InitUI() override {}
 
 	void DrawUI() override
@@ -766,10 +876,10 @@ private:
 
 	const glm::vec3 playerSpawn{0.0f, 33.0f, 10.0f};
 	const glm::vec3 droneSpawn{6.0f, 30.6f, 0.0f};
-	const glm::vec3 airplaneSpawn{-6.0f, 30.6f, 0.0f};
+	const glm::vec3 airplaneSpawn{-6.0f, 31.2f, 0.0f};
 
-	float walkSpeed = 5.0f;
-	float sprintSpeed = 8.0f;
+	float walkSpeed = 25.0f;
+	float sprintSpeed = 40.0f;
 
 	float droneThrust = 30.0f;
 	float droneLift = 18.0f;
@@ -813,4 +923,7 @@ private:
 
 	std::shared_ptr<fe::Object> airplaneObject_;
 	fe::PhysicsObject *airplaneBody_ = nullptr;
+	fe::Object *airplaneGearObject_ = nullptr;
+	fe::PhysicsVehicle *airplaneVehicle_ = nullptr;
+	bool airplaneGearDown = true;
 };
