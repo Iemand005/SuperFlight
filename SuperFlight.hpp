@@ -87,9 +87,11 @@ public:
 
 		Update();
 
-		if (smokeBox_ && smokeFrame_ < 260)
+		if (smokeBox_ && smokeFrame_ < 200)
 		{
-			std::cout << "[SMOKE] frame " << smokeFrame_ << " y=" << smokeBox_->GetPosition().y << " vy=" << smokeBox_->GetLinearVelocity().y << std::endl;
+			std::cout << "[SMOKE] frame " << smokeFrame_ << " boxY=" << smokeBox_->GetPosition().y
+					  << " playerY=" << (player && player->physicsCharacter ? player->physicsCharacter->GetPosition().y : -999.0f)
+					  << std::endl;
 			++smokeFrame_;
 		}
 
@@ -125,7 +127,7 @@ public:
 			smokeBox_ = physics->CreateObject(glm::vec3(1.0f, 1.0f, 1.0f), true, true);
 			if (smokeBox_)
 			{
-				smokeBox_->SetPosition(glm::vec3(0.0f, 45.0f, 0.0f));
+				smokeBox_->SetPosition(glm::vec3(16.0f, 45.0f, 6.0f));
 				smokeBox_->SetDamping(0.0f, 0.0f);
 				smokeBox_->SetLinearVelocity(glm::vec3(0.0f));
 			}
