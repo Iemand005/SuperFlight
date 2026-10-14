@@ -11,6 +11,12 @@
 #include <Object.hpp>
 #include <Primitives.hpp>
 
+#include "ChunkManager.hpp"
+#ifdef FE_HAS_VULKAN
+#include "ChunkMesher.hpp"
+#include "ChunkBatcher.hpp"
+#endif
+
 class SuperFlight : public fe::EditableGame
 {
 public:
@@ -18,21 +24,21 @@ public:
 	{
 		SetClearColor(0.05f, 0.07f, 0.12f);
 
-		auto groundMesh = fe::Primitives::GeneratePlane(fe::PlaneDirection::Top, 400.0f, 400.0f);
-		ground_ = std::make_shared<fe::Object>(groundMesh);
-		ground_->name = "Ground";
-		ground_->color = glm::vec3(0.12f, 0.13f, 0.16f);
-		ground_->isStatic = true;
-		if (auto* physics = GetPhysicsFactory())
+#ifdef FE_HAS_VULKAN
+		if (options.useVulkan)
 		{
-			ground_->SetPhysicsObject(physics->CreateObject(groundMesh.vertices, groundMesh.indices));
-			if (ground_->physicsObject)
-				ground_->physicsObject->SetPosition(glm::vec3(0.0f));
+			LoadArrayShaders("resources/shaders/VertexShader_vk_array.spv", "resources/shaders/FragmentShader_vk_array.spv");
+			LoadFoxcraftShaders("resources/shaders/VertexShader_vk_foxcraft.spv", "resources/shaders/FragmentShader_vk_array.spv");
+			chunkBatcher_ = std::make_unique<ChunkBatcher>(
+				static_cast<fe::VulkanDevice *>(renderDevice.get()),
+				ChunkMesher::BlockTextures());
+			chunkManager->SetBatcher(chunkBatcher_.get());
+			chunkManager->SetUseBatcherPath(true);
 		}
-		scene->AddObject(ground_);
+#endif
 
-		camera->SetPos(glm::vec3(0.0f, 2.0f, 0.0f));
-		camera->LookAt(glm::vec3(0.0f, 2.0f, -10.0f));
+		camera->SetPos(glm::vec3(0.0f, 70.0f, 0.0f));
+		camera->LookAt(glm::vec3(0.0f, 70.0f, -10.0f));
 	}
 
 	void Init() override
@@ -52,12 +58,40 @@ public:
 		if (droneMode && droneBody_)
 			DroneUpdate(GetWindow<fe::SDLWindow>(), dt);
 
+		UpdateLoadedChunks();
+		chunkManager->Update(1, GetPhysicsFactory(), scene.get(),
+							 playerCenter_, chunkLoadDistance, physicsDistance);
+
 		Update();
 
 		if (droneMode && droneBody_)
 			camera->SetPos(droneBody_->GetPosition());
 
 		Redraw();
+	}
+
+	void UpdateLoadedChunks()
+	{
+		glm::vec3 pos = camera->GetPos();
+		int chunkX = static_cast<int>(std::floor(pos.x / static_cast<float>(Chunk::WIDTH)));
+		int chunkZ = static_cast<int>(std::floor(pos.z / static_cast<float>(Chunk::DEPTH)));
+		playerCenter_ = {chunkX, chunkZ};
+
+		int terrainDist = chunkLoadDistance + chunkOutgenDistance;
+		chunkManager->LoadChunksInsideRange(playerCenter_, terrainDist);
+		chunkManager->UnloadChunksOutsideRange(playerCenter_, terrainDist);
+	}
+
+	void OnDraw() override
+	{
+		fe::EditableGame::OnDraw();
+#ifdef FE_HAS_VULKAN
+		if (chunkBatcher_ && useVulkan)
+		{
+			chunkBatcher_->Update(camera->GetPos());
+			chunkBatcher_->Draw();
+		}
+#endif
 	}
 
 	void ProcessInput()
@@ -206,7 +240,7 @@ public:
 		droneObject_ = std::make_shared<fe::Object>(mesh);
 		droneObject_->name = "Drone";
 		droneObject_->color = glm::vec3(1.0f, 0.45f, 0.0f);
-		droneObject_->state.position = glm::vec3(0.0f, 2.0f, 0.0f);
+		droneObject_->state.position = glm::vec3(0.0f, 70.0f, 0.0f);
 
 		droneObject_->SetPhysicsObject(physics->CreateSphereObject(0.25f, true));
 		droneBody_ = droneObject_->physicsObject.get();
@@ -271,7 +305,15 @@ private:
 	float droneGravity = 9.81f;
 	bool droneAltitudeHold = true;
 
-	std::shared_ptr<fe::Object> ground_;
+	std::unique_ptr<ChunkManager> chunkManager = std::make_unique<ChunkManager>(4);
+#ifdef FE_HAS_VULKAN
+	std::unique_ptr<ChunkBatcher> chunkBatcher_;
+#endif
+	glm::ivec2 playerCenter_{0, 0};
+	int chunkLoadDistance = 6;
+	int chunkOutgenDistance = 1;
+	int physicsDistance = 2;
+
 	std::shared_ptr<fe::Object> droneObject_;
 	fe::PhysicsObject* droneBody_ = nullptr;
 };
