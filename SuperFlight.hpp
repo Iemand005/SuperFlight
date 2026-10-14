@@ -124,10 +124,6 @@ public:
 
 		if (auto *physics = GetPhysicsFactory())
 		{
-			smokePlatform_ = physics->CreateObject(glm::vec3(40.0f, 1.0f, 40.0f), false, true);
-			if (smokePlatform_)
-				smokePlatform_->SetPosition(glm::vec3(16.0f, 20.0f, 6.0f));
-
 			smokeBox_ = physics->CreateObject(glm::vec3(1.0f, 1.0f, 1.0f), true, true);
 			if (smokeBox_)
 			{
