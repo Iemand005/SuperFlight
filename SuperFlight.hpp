@@ -121,16 +121,19 @@ public:
 
 		CreatePlayer();
 		CreateParkedVehicles();
+	}
 
-		if (auto *physics = GetPhysicsFactory())
+	void SpawnSmokeBox()
+	{
+		auto *physics = GetPhysicsFactory();
+		if (!physics)
+			return;
+		smokeBox_ = physics->CreateObject(glm::vec3(1.0f, 1.0f, 1.0f), true, true);
+		if (smokeBox_)
 		{
-			smokeBox_ = physics->CreateObject(glm::vec3(1.0f, 1.0f, 1.0f), true, true);
-			if (smokeBox_)
-			{
-				smokeBox_->SetPosition(glm::vec3(16.0f, 45.0f, 6.0f));
-				smokeBox_->SetDamping(0.0f, 0.0f);
-				smokeBox_->SetLinearVelocity(glm::vec3(0.0f));
-			}
+			smokeBox_->SetPosition(glm::vec3(16.0f, 45.0f, 6.0f));
+			smokeBox_->SetDamping(0.0f, 0.0f);
+			smokeBox_->SetLinearVelocity(glm::vec3(0.0f));
 		}
 	}
 
