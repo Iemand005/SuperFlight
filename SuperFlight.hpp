@@ -87,6 +87,9 @@ public:
 
 		Update();
 
+		// Poses were polled during the previous RedrawVR; snap the controller
+		// cubes to them before drawing again.
+		UpdateControllerCubes();
 
 
 		switch (mode)
@@ -98,8 +101,6 @@ public:
 
 		Redraw();
 	}
-
-	// ---------------------------------------------------------------- world
 
 	void SetupWorld()
 	{
@@ -115,6 +116,52 @@ public:
 
 		CreatePlayer();
 		CreateParkedVehicles();
+		CreateControllerCubes();
+	}
+
+	void CreateControllerCubes()
+	{
+		// Two small cubes that follow the XR controllers each frame (grip
+		// pose) so hand tracking is visible both on screen and in the HMD.
+		leftControllerObject_ = std::make_shared<fe::Object>(fe::Primitives::GenerateCube(
+			{fe::PlaneDirection::Front, fe::PlaneDirection::Back,
+			 fe::PlaneDirection::Left, fe::PlaneDirection::Right,
+			 fe::PlaneDirection::Top, fe::PlaneDirection::Bottom},
+			0.08f));
+		leftControllerObject_->name = "LeftController";
+		leftControllerObject_->color = glm::vec3(0.2f, 0.8f, 1.0f);
+		leftControllerObject_->state.position = playerSpawn + glm::vec3(-0.25f, 1.2f, -0.3f);
+		leftControllerObject_->isStatic = true;
+		leftControllerObject_->visible = leftGripPoseActive;
+		scene->AddObject(leftControllerObject_);
+
+		rightControllerObject_ = std::make_shared<fe::Object>(fe::Primitives::GenerateCube(
+			{fe::PlaneDirection::Front, fe::PlaneDirection::Back,
+			 fe::PlaneDirection::Left, fe::PlaneDirection::Right,
+			 fe::PlaneDirection::Top, fe::PlaneDirection::Bottom},
+			0.08f));
+		rightControllerObject_->name = "RightController";
+		rightControllerObject_->color = glm::vec3(1.0f, 0.5f, 0.1f);
+		rightControllerObject_->state.position = playerSpawn + glm::vec3(0.25f, 1.2f, -0.3f);
+		rightControllerObject_->isStatic = true;
+		rightControllerObject_->visible = rightGripPoseActive;
+		scene->AddObject(rightControllerObject_);
+	}
+
+	void UpdateControllerCubes()
+	{
+		if (leftControllerObject_)
+		{
+			leftControllerObject_->visible = leftGripPoseActive;
+			if (leftGripPoseActive)
+				leftControllerObject_->state.position = leftGripPosition;
+		}
+		if (rightControllerObject_)
+		{
+			rightControllerObject_->visible = rightGripPoseActive;
+			if (rightGripPoseActive)
+				rightControllerObject_->state.position = rightGripPosition;
+		}
 	}
 
 	void RebuildPlayerPhysicsBody()
@@ -284,8 +331,6 @@ public:
 		mode = Mode::Walking;
 		SyncCameraToPlayer();
 	}
-
-	// ------------------------------------------------------------- movement
 
 	void UpdateLoadedChunks()
 	{
@@ -829,8 +874,33 @@ public:
 
 	void DrawUI() override
 	{
-		if (!showDebugUI) return;
+		const bool showXRPoses = IsInstanceValid();
+		if (!showDebugUI && !showXRPoses)
+			return;
 		BeginFrame();
+
+		if (showXRPoses)
+		{
+			ImGui::Begin("XR Controllers");
+			auto poseLine = [](const char* label, const glm::vec3& p, bool active)
+			{
+				if (active)
+					ImGui::Text("%s  x %.3f  y %.3f  z %.3f", label, p.x, p.y, p.z);
+				else
+					ImGui::TextDisabled("%s  (not tracked)", label);
+			};
+			poseLine("Left grip ", leftGripPosition, leftGripPoseActive);
+			poseLine("Left aim  ", leftAimPosition, leftAimPoseActive);
+			poseLine("Right grip", rightGripPosition, rightGripPoseActive);
+			poseLine("Right aim ", rightAimPosition, rightAimPoseActive);
+			ImGui::End();
+		}
+
+		if (!showDebugUI)
+		{
+			EndFrame();
+			return;
+		}
 
 		ImGui::Begin("SuperFlight");
 		ImGui::Text("Mode: %s", mode == Mode::Walking ? "Walking" : (mode == Mode::Drone ? "Drone" : "Airplane"));
@@ -941,6 +1011,9 @@ private:
 
 	std::shared_ptr<fe::Object> droneObject_;
 	fe::PhysicsObject *droneBody_ = nullptr;
+
+	std::shared_ptr<fe::Object> leftControllerObject_;
+	std::shared_ptr<fe::Object> rightControllerObject_;
 
 	float airplaneThrottle = 0.0f;
 	float airplaneAirSpeed = 0.0f;
