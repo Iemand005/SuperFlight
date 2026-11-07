@@ -167,7 +167,7 @@ public:
 
 	void HandleXRSpawning()
 	{
-		if (GetOpenXR().ConsumeButtonPress(fe::OpenXR::Button::SpawnSphere))
+		if (GetOpenXR().ConsumeButtonPress(fe::OpenXR::Button::X))
 			SpawnSphere();
 	}
 
@@ -214,6 +214,53 @@ public:
 		const float shrinkRate = 0.5f;
 		const float maxScale = 1.35f;
 		const float cubeHalfExtent = 0.08f;
+
+		// Track hand motion so a released object keeps the hand's momentum.
+		auto updateHandMotion = [&](const glm::vec3& pos, const glm::quat& rot, bool active,
+									glm::vec3& prevPos, glm::quat& prevRot, bool& hasPrev,
+									glm::vec3& velocity, glm::vec3& angularVelocity)
+		{
+			if (!active)
+			{
+				hasPrev = false;
+				velocity = glm::vec3(0.0f);
+				angularVelocity = glm::vec3(0.0f);
+				return;
+			}
+
+			if (hasPrev && dt > 1e-5f)
+			{
+				const glm::vec3 rawVelocity = (pos - prevPos) / dt;
+				velocity = glm::mix(velocity, rawVelocity, 0.5f);
+
+				glm::quat delta = rot * glm::inverse(prevRot);
+				if (delta.w < 0.0f)
+					delta = glm::quat(-delta.w, -delta.x, -delta.y, -delta.z);
+				const float angle = 2.0f * std::acos(std::clamp(delta.w, -1.0f, 1.0f));
+				const glm::vec3 axis(delta.x, delta.y, delta.z);
+				const float axisLength = glm::length(axis);
+				if (axisLength > 1e-6f && angle > 1e-6f)
+				{
+					const glm::vec3 rawAngular = (axis / axisLength) * (angle / dt);
+					angularVelocity = glm::mix(angularVelocity, rawAngular, 0.5f);
+				}
+				else
+				{
+					angularVelocity = glm::vec3(0.0f);
+				}
+			}
+
+			prevPos = pos;
+			prevRot = rot;
+			hasPrev = true;
+		};
+
+		updateHandMotion(leftGripPosition, leftGripOrientation, leftGripPoseActive,
+						 prevLeftGripPosition_, prevLeftGripOrientation_, hasPrevLeftGrip_,
+						 leftGripVelocity_, leftGripAngularVelocity_);
+		updateHandMotion(rightGripPosition, rightGripOrientation, rightGripPoseActive,
+						 prevRightGripPosition_, prevRightGripOrientation_, hasPrevRightGrip_,
+						 rightGripVelocity_, rightGripAngularVelocity_);
 
 		// Nearest grabbable sphere within reach of a hand.
 		auto findTouched = [&](const glm::vec3& gripPos, float scale) -> std::shared_ptr<fe::Object> {
@@ -348,8 +395,22 @@ public:
 		{
 			grabbedObject_->physicsObject->SetPosition(grabbedObject_->state.position);
 			grabbedObject_->physicsObject->SetRotation(grabbedObject_->state.orientation);
-			grabbedObject_->physicsObject->SetLinearVelocity(glm::vec3(0.0f));
-			grabbedObject_->physicsObject->SetAngularVelocity(glm::vec3(0.0f));
+
+			// Carry the hand's momentum into the object so it can be thrown.
+			glm::vec3 throwVelocity = grabbedHand_ == 0 ? leftGripVelocity_ : rightGripVelocity_;
+			const float maxThrowSpeed = 25.0f;
+			const float throwSpeed = glm::length(throwVelocity);
+			if (throwSpeed > maxThrowSpeed)
+				throwVelocity = throwVelocity / throwSpeed * maxThrowSpeed;
+
+			glm::vec3 spin = grabbedHand_ == 0 ? leftGripAngularVelocity_ : rightGripAngularVelocity_;
+			const float maxSpin = 30.0f;
+			const float spinLength = glm::length(spin);
+			if (spinLength > maxSpin)
+				spin = spin / spinLength * maxSpin;
+
+			grabbedObject_->physicsObject->SetLinearVelocity(throwVelocity);
+			grabbedObject_->physicsObject->SetAngularVelocity(spin);
 		}
 		grabbedObject_->isStatic = grabWasStatic_;
 		grabbedObject_.reset();
@@ -1106,9 +1167,12 @@ public:
 				else
 					ImGui::TextDisabled("%s: up", label);
 			};
-			heldLine("Spawn sphere (left X)", GetOpenXR().IsButtonHeld(fe::OpenXR::Button::SpawnSphere));
-			heldLine("Left trigger (prev block)", GetOpenXR().IsButtonHeld(fe::OpenXR::Button::PreviousBlock));
-			heldLine("Right trigger (next block)", GetOpenXR().IsButtonHeld(fe::OpenXR::Button::NextBlock));
+			heldLine("X (left, spawn)", GetOpenXR().IsButtonHeld(fe::OpenXR::Button::X));
+			heldLine("Y (left)", GetOpenXR().IsButtonHeld(fe::OpenXR::Button::Y));
+			heldLine("A (right)", GetOpenXR().IsButtonHeld(fe::OpenXR::Button::A));
+			heldLine("B (right)", GetOpenXR().IsButtonHeld(fe::OpenXR::Button::B));
+			heldLine("Left trigger", GetOpenXR().IsButtonHeld(fe::OpenXR::Button::LeftTrigger));
+			heldLine("Right trigger", GetOpenXR().IsButtonHeld(fe::OpenXR::Button::RightTrigger));
 			heldLine("Left squeeze (grip)", GetOpenXR().IsGripPressed(fe::OpenXR::Hand::Left));
 			heldLine("Right squeeze (grip)", GetOpenXR().IsGripPressed(fe::OpenXR::Hand::Right));
 			ImGui::Text("Holding: %s (%s)",
@@ -1247,6 +1311,17 @@ private:
 	glm::vec3 grabLocalOffset_{0.0f};
 	glm::quat grabLocalRotation_{1.0f, 0.0f, 0.0f, 0.0f};
 	bool grabWasStatic_ = false;
+
+	glm::vec3 prevLeftGripPosition_{0.0f};
+	glm::vec3 prevRightGripPosition_{0.0f};
+	glm::quat prevLeftGripOrientation_{1.0f, 0.0f, 0.0f, 0.0f};
+	glm::quat prevRightGripOrientation_{1.0f, 0.0f, 0.0f, 0.0f};
+	bool hasPrevLeftGrip_ = false;
+	bool hasPrevRightGrip_ = false;
+	glm::vec3 leftGripVelocity_{0.0f};
+	glm::vec3 rightGripVelocity_{0.0f};
+	glm::vec3 leftGripAngularVelocity_{0.0f};
+	glm::vec3 rightGripAngularVelocity_{0.0f};
 
 	float airplaneThrottle = 0.0f;
 	float airplaneAirSpeed = 0.0f;
