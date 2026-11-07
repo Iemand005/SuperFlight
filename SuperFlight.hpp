@@ -112,8 +112,8 @@ public:
 		Chunk::landingStrip.enabled = true;
 		Chunk::landingStrip.minX = -48.0f;
 		Chunk::landingStrip.maxX = 48.0f;
-		Chunk::landingStrip.minZ = -12.0f;
-		Chunk::landingStrip.maxZ = 12.0f;
+		Chunk::landingStrip.minZ = -64.0f;
+		Chunk::landingStrip.maxZ = 16.0f;
 		Chunk::landingStrip.height = 30;
 
 		if (auto *physics = GetPhysicsFactory())
@@ -123,6 +123,42 @@ public:
 		CreateParkedVehicles();
 		CreateControllerCubes();
 		CreateBall();
+		CreateThrowingLane();
+	}
+
+	void CreateThrowingLane()
+	{
+		const glm::vec3 laneCenter(0.0f, 0.0f, -24.0f);
+		auto addLanePart = [&](const std::string& name, const glm::vec3& color,
+							   const glm::vec3& size, const glm::vec3& position)
+		{
+			auto part = std::make_shared<fe::Object>(fe::Primitives::GenerateCube(1.0f));
+			part->name = name;
+			part->color = color;
+			part->state.position = position;
+			part->state.scale = size;
+			part->isStatic = true;
+
+			if (auto* physics = GetPhysicsFactory())
+			{
+				auto body = physics->CreateObject(size, false);
+				if (body)
+					body->SetPosition(position);
+				part->SetPhysicsObject(std::move(body));
+			}
+
+			scene->AddObject(part);
+		};
+
+		addLanePart("ThrowingLaneFloor", glm::vec3(0.38f, 0.40f, 0.43f),
+					glm::vec3(15.0f, 0.2f, 80.0f),
+					laneCenter + glm::vec3(0.0f, 29.9f, 0.0f));
+		addLanePart("ThrowingLaneLeftWall", glm::vec3(0.26f, 0.30f, 0.34f),
+					glm::vec3(0.2f, 0.8f, 80.0f),
+					laneCenter + glm::vec3(-7.4f, 30.4f, 0.0f));
+		addLanePart("ThrowingLaneRightWall", glm::vec3(0.26f, 0.30f, 0.34f),
+					glm::vec3(0.2f, 0.8f, 80.0f),
+					laneCenter + glm::vec3(7.4f, 30.4f, 0.0f));
 	}
 
 	void CreateControllerCubes()
@@ -244,7 +280,7 @@ public:
 			if (hasPrev && dt > 1e-5f)
 			{
 				const glm::vec3 rawVelocity = (pos - prevPos) / dt;
-				velocity = glm::mix(velocity, rawVelocity, 0.5f);
+				velocity = glm::mix(velocity, rawVelocity, 0.75f);
 
 				glm::quat delta = rot * glm::inverse(prevRot);
 				if (delta.w < 0.0f)
@@ -411,7 +447,8 @@ public:
 
 			// Carry the hand's momentum into the object so it can be thrown.
 			glm::vec3 throwVelocity = grabbedHand_ == 0 ? leftGripVelocity_ : rightGripVelocity_;
-			const float maxThrowSpeed = 25.0f;
+			throwVelocity *= 2.5f;
+			const float maxThrowSpeed = 45.0f;
 			const float throwSpeed = glm::length(throwVelocity);
 			if (throwSpeed > maxThrowSpeed)
 				throwVelocity = throwVelocity / throwSpeed * maxThrowSpeed;
