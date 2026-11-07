@@ -195,7 +195,7 @@ public:
 			{
 				scale = std::min(scale + growRate * dt, maxScale);
 				if (!touching)
-					GetOpenXR().TriggerHaptic(hand, 0.35f, 0.06f);
+					GetOpenXR().TriggerHaptic(hand, 0.7f, 0.08f);
 			}
 			else if (!hit)
 			{
