@@ -131,10 +131,17 @@ if(NOT ANDROID)
 		COMMENT "Copying SuperFlight resources to ${RESOURCE_OUT_DIR}"
 	)
 
-	find_program(GLSLC glslc HINTS
-		$ENV{VULKAN_SDK}/Bin
-		$ENV{VULKAN_SDK}/bin
-	)
+	if(Vulkan_GLSLC_EXECUTABLE AND EXISTS "${Vulkan_GLSLC_EXECUTABLE}")
+		set(GLSLC "${Vulkan_GLSLC_EXECUTABLE}")
+	else()
+		if(GLSLC AND NOT EXISTS "${GLSLC}")
+			unset(GLSLC CACHE)
+		endif()
+		find_program(GLSLC glslc HINTS
+			$ENV{VULKAN_SDK}/Bin
+			$ENV{VULKAN_SDK}/bin
+		)
+	endif()
 
 	if(GLSLC)
 		message(STATUS "Found glslc: ${GLSLC}")
