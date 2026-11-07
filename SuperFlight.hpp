@@ -154,13 +154,13 @@ public:
 		{
 			leftControllerObject_->visible = leftGripPoseActive;
 			if (leftGripPoseActive)
-				leftControllerObject_->state.position = leftGripPosition;
+				leftControllerObject_->SetPosition(leftGripPosition);
 		}
 		if (rightControllerObject_)
 		{
 			rightControllerObject_->visible = rightGripPoseActive;
 			if (rightGripPoseActive)
-				rightControllerObject_->state.position = rightGripPosition;
+				rightControllerObject_->SetPosition(rightGripPosition);
 		}
 	}
 
