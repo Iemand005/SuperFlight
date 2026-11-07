@@ -160,7 +160,20 @@ public:
 		ballObject_->name = "XRBall";
 		ballObject_->color = glm::vec3(0.95f, 0.85f, 0.2f);
 		ballObject_->state.position = playerSpawn + glm::vec3(0.0f, 1.05f, -0.55f);
-		ballObject_->isStatic = true;
+		ballObject_->isStatic = false;
+
+		if (auto *physics = GetPhysicsFactory())
+		{
+			auto body = physics->CreateSphereObject(ballRadius_, true);
+			if (body)
+			{
+				body->SetPosition(ballObject_->state.position);
+				body->SetLinearVelocity(glm::vec3(0.0f));
+				body->SetAngularVelocity(glm::vec3(0.0f));
+			}
+			ballObject_->SetPhysicsObject(std::move(body));
+		}
+
 		scene->AddObject(ballObject_);
 		grabbableObjects_.push_back(ballObject_);
 	}
