@@ -18,6 +18,7 @@
 #include <Character.hpp>
 #include <Primitives.hpp>
 #include <physics/PhysicsVehicle.hpp>
+#include <vr/OpenXR.hpp>
 
 #include "ChunkManager.hpp"
 #ifdef FE_HAS_VULKAN
@@ -89,7 +90,7 @@ public:
 
 		// Poses were polled during the previous RedrawVR; snap the controller
 		// cubes to them before drawing again.
-		UpdateControllerCubes();
+		UpdateControllerCubes(dt);
 
 
 		switch (mode)
@@ -117,6 +118,7 @@ public:
 		CreatePlayer();
 		CreateParkedVehicles();
 		CreateControllerCubes();
+		CreateBall();
 	}
 
 	void CreateControllerCubes()
@@ -148,20 +150,63 @@ public:
 		scene->AddObject(rightControllerObject_);
 	}
 
-	void UpdateControllerCubes()
+	void CreateBall()
 	{
-		if (leftControllerObject_)
+		ballObject_ = std::make_shared<fe::Object>(fe::Primitives::GenerateSphere(ballRadius_, 24, 16));
+		ballObject_->name = "XRBall";
+		ballObject_->color = glm::vec3(0.95f, 0.85f, 0.2f);
+		ballObject_->state.position = playerSpawn + glm::vec3(0.0f, 1.05f, -0.55f);
+		ballObject_->isStatic = true;
+		scene->AddObject(ballObject_);
+	}
+
+	void UpdateControllerCubes(float dt)
+	{
+		const float baseScale = 1.0f;
+		const float growRate = 1.5f;
+		const float shrinkRate = 2.0f;
+		const float maxScale = 3.0f;
+		const float cubeHalfExtent = 0.08f;
+
+		auto updateCube = [&](const std::shared_ptr<fe::Object>& cube,
+							  const glm::vec3& gripPos, bool poseActive,
+							  float& scale, bool& touching, fe::OpenXR::Hand hand)
 		{
-			leftControllerObject_->visible = leftGripPoseActive;
-			if (leftGripPoseActive)
-				leftControllerObject_->SetPosition(leftGripPosition);
-		}
-		if (rightControllerObject_)
-		{
-			rightControllerObject_->visible = rightGripPoseActive;
-			if (rightGripPoseActive)
-				rightControllerObject_->SetPosition(rightGripPosition);
-		}
+			if (!cube)
+				return;
+
+			cube->visible = poseActive;
+			if (!poseActive)
+			{
+				touching = false;
+				return;
+			}
+
+			cube->SetPosition(gripPos);
+
+			const float reach = cubeHalfExtent * scale + ballRadius_;
+			const bool hit = ballObject_ &&
+				glm::length(gripPos - ballObject_->state.position) <= reach;
+
+			if (hit)
+			{
+				scale = std::min(scale + growRate * dt, maxScale);
+				if (!touching)
+					GetOpenXR().TriggerHaptic(hand, 0.7f, 0.08f);
+			}
+			else
+			{
+				scale = std::max(scale - shrinkRate * dt, baseScale);
+			}
+
+			touching = hit;
+			cube->SetScale(glm::vec3(scale));
+		};
+
+		updateCube(leftControllerObject_, leftGripPosition, leftGripPoseActive,
+				   leftControllerScale_, leftTouchingBall_, fe::OpenXR::Hand::Left);
+		updateCube(rightControllerObject_, rightGripPosition, rightGripPoseActive,
+				   rightControllerScale_, rightTouchingBall_, fe::OpenXR::Hand::Right);
 	}
 
 	void RebuildPlayerPhysicsBody()
@@ -1014,6 +1059,12 @@ private:
 
 	std::shared_ptr<fe::Object> leftControllerObject_;
 	std::shared_ptr<fe::Object> rightControllerObject_;
+	std::shared_ptr<fe::Object> ballObject_;
+	float ballRadius_ = 0.25f;
+	float leftControllerScale_ = 1.0f;
+	float rightControllerScale_ = 1.0f;
+	bool leftTouchingBall_ = false;
+	bool rightTouchingBall_ = false;
 
 	float airplaneThrottle = 0.0f;
 	float airplaneAirSpeed = 0.0f;
