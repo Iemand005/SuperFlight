@@ -7,6 +7,7 @@
 #include <vector>
 #include <limits>
 #include <algorithm>
+#include <stdexcept>
 
 #include <cmath>
 #include <glm/glm.hpp>
@@ -578,7 +579,7 @@ public:
 
 		if (mode == Mode::Drone && drone_ && drone_->IsSpawned())
 		{
-			vehicle = drone_->GetObject().get();
+			vehicle = drone_->GetDroneObject().get();
 			drone_->Exit();
 		}
 		else if (mode == Mode::Airplane && airplaneObject_)
@@ -809,7 +810,7 @@ public:
 		float bestT = std::numeric_limits<float>::max();
 
 		fe::Object *candidates[2] = {
-			drone_ ? drone_->GetObject().get() : nullptr,
+			drone_ ? drone_->GetDroneObject().get() : nullptr,
 			airplaneObject_.get()};
 		for (fe::Object *obj : candidates)
 		{
@@ -829,7 +830,7 @@ public:
 			}
 		}
 
-		if (drone_ && best == drone_->GetObject().get())
+		if (drone_ && best == drone_->GetDroneObject().get())
 			EnterDrone();
 		else if (best == airplaneObject_.get())
 			EnterAirplane();
