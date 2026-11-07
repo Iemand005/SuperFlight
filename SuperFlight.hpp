@@ -163,6 +163,7 @@ public:
 
 	void CreateControllerCubes()
 	{
+		const fe::OpenXR::InputState input = GetWorldInputState();
 		// Two small cubes that follow the XR controllers each frame (grip
 		// pose) so hand tracking is visible both on screen and in the HMD.
 		leftControllerObject_ = std::make_shared<fe::Object>(fe::Primitives::GenerateCube(
@@ -174,7 +175,7 @@ public:
 		leftControllerObject_->color = glm::vec3(0.2f, 0.8f, 1.0f);
 		leftControllerObject_->state.position = playerSpawn + glm::vec3(-0.25f, 1.2f, -0.3f);
 		leftControllerObject_->isStatic = true;
-		leftControllerObject_->visible = leftGripPoseActive;
+		leftControllerObject_->visible = input.leftGripPoseActive;
 		scene->AddObject(leftControllerObject_);
 
 		rightControllerObject_ = std::make_shared<fe::Object>(fe::Primitives::GenerateCube(
@@ -186,7 +187,7 @@ public:
 		rightControllerObject_->color = glm::vec3(1.0f, 0.5f, 0.1f);
 		rightControllerObject_->state.position = playerSpawn + glm::vec3(0.25f, 1.2f, -0.3f);
 		rightControllerObject_->isStatic = true;
-		rightControllerObject_->visible = rightGripPoseActive;
+		rightControllerObject_->visible = input.rightGripPoseActive;
 		scene->AddObject(rightControllerObject_);
 	}
 
@@ -258,6 +259,7 @@ public:
 
 	void UpdateControllerCubes(float dt)
 	{
+		const fe::OpenXR::InputState input = GetWorldInputState();
 		const float baseScale = 1.0f;
 		const float growRate = 0.2f;
 		const float shrinkRate = 0.5f;
@@ -304,10 +306,10 @@ public:
 			hasPrev = true;
 		};
 
-		updateHandMotion(leftGripPosition, leftGripOrientation, leftGripPoseActive,
+		updateHandMotion(input.leftGripPosition, input.leftGripOrientation, input.leftGripPoseActive,
 						 prevLeftGripPosition_, prevLeftGripOrientation_, hasPrevLeftGrip_,
 						 leftGripVelocity_, leftGripAngularVelocity_);
-		updateHandMotion(rightGripPosition, rightGripOrientation, rightGripPoseActive,
+		updateHandMotion(input.rightGripPosition, input.rightGripOrientation, input.rightGripPoseActive,
 						 prevRightGripPosition_, prevRightGripOrientation_, hasPrevRightGrip_,
 						 rightGripVelocity_, rightGripAngularVelocity_);
 
@@ -366,11 +368,11 @@ public:
 			cube->SetScale(glm::vec3(scale));
 		};
 
-		updateCube(leftControllerObject_, leftGripPosition, leftGripOrientation,
-				   leftGripPoseActive, leftControllerScale_, leftTouchingObject_,
+		updateCube(leftControllerObject_, input.leftGripPosition, input.leftGripOrientation,
+				   input.leftGripPoseActive, leftControllerScale_, leftTouchingObject_,
 				   0, fe::OpenXR::Hand::Left);
-		updateCube(rightControllerObject_, rightGripPosition, rightGripOrientation,
-				   rightGripPoseActive, rightControllerScale_, rightTouchingObject_,
+		updateCube(rightControllerObject_, input.rightGripPosition, input.rightGripOrientation,
+				   input.rightGripPoseActive, rightControllerScale_, rightTouchingObject_,
 				   1, fe::OpenXR::Hand::Right);
 
 		const bool leftGrip = GetOpenXR().IsGripPressed(fe::OpenXR::Hand::Left);
@@ -379,7 +381,7 @@ public:
 		if (grabbedObject_)
 		{
 			const bool handGrip = grabbedHand_ == 0 ? leftGrip : rightGrip;
-			const bool poseActive = grabbedHand_ == 0 ? leftGripPoseActive : rightGripPoseActive;
+			const bool poseActive = grabbedHand_ == 0 ? input.leftGripPoseActive : input.rightGripPoseActive;
 			if (!handGrip || !poseActive)
 			{
 				ReleaseGrabbedObject();
@@ -389,8 +391,8 @@ public:
 				// Rigidly attach to the hand: the offset is stored in hand-local
 				// space, so moving and rotating the hand moves and rotates the
 				// object around the grip point.
-				const glm::vec3 handPos = grabbedHand_ == 0 ? leftGripPosition : rightGripPosition;
-				const glm::quat handRot = grabbedHand_ == 0 ? leftGripOrientation : rightGripOrientation;
+				const glm::vec3 handPos = grabbedHand_ == 0 ? input.leftGripPosition : input.rightGripPosition;
+				const glm::quat handRot = grabbedHand_ == 0 ? input.leftGripOrientation : input.rightGripOrientation;
 				const glm::vec3 targetPos = handPos + handRot * grabLocalOffset_;
 				const glm::quat targetRot = handRot * grabLocalRotation_;
 				grabbedObject_->SetPosition(targetPos);
@@ -405,15 +407,15 @@ public:
 		}
 
 		// Grab the nearest object touched by a gripping hand.
-		if (leftGrip && leftGripPoseActive)
+		if (leftGrip && input.leftGripPoseActive)
 		{
-			if (auto obj = findTouched(leftGripPosition, leftControllerScale_))
-				GrabObject(obj, 0, leftGripPosition, leftGripOrientation);
+			if (auto obj = findTouched(input.leftGripPosition, leftControllerScale_))
+				GrabObject(obj, 0, input.leftGripPosition, input.leftGripOrientation);
 		}
-		else if (rightGrip && rightGripPoseActive)
+		else if (rightGrip && input.rightGripPoseActive)
 		{
-			if (auto obj = findTouched(rightGripPosition, rightControllerScale_))
-				GrabObject(obj, 1, rightGripPosition, rightGripOrientation);
+			if (auto obj = findTouched(input.rightGripPosition, rightControllerScale_))
+				GrabObject(obj, 1, input.rightGripPosition, input.rightGripOrientation);
 		}
 	}
 
@@ -1184,6 +1186,7 @@ public:
 
 		if (showXRPoses)
 		{
+			const fe::OpenXR::InputState input = GetWorldInputState();
 			ImGui::Begin("XR Controllers");
 			auto poseLine = [](const char* label, const glm::vec3& p, bool active)
 			{
@@ -1199,14 +1202,14 @@ public:
 				else
 					ImGui::TextDisabled("%s  (not tracked)", label);
 			};
-			poseLine("Left grip ", leftGripPosition, leftGripPoseActive);
-			poseLine("Left aim  ", leftAimPosition, leftAimPoseActive);
-			poseLine("Right grip", rightGripPosition, rightGripPoseActive);
-			poseLine("Right aim ", rightAimPosition, rightAimPoseActive);
-			rotationLine("Left grip rot ", leftGripOrientation, leftGripPoseActive);
-			rotationLine("Left aim rot  ", leftAimOrientation, leftAimPoseActive);
-			rotationLine("Right grip rot", rightGripOrientation, rightGripPoseActive);
-			rotationLine("Right aim rot ", rightAimOrientation, rightAimPoseActive);
+			poseLine("Left grip ", input.leftGripPosition, input.leftGripPoseActive);
+			poseLine("Left aim  ", input.leftAimPosition, input.leftAimPoseActive);
+			poseLine("Right grip", input.rightGripPosition, input.rightGripPoseActive);
+			poseLine("Right aim ", input.rightAimPosition, input.rightAimPoseActive);
+			rotationLine("Left grip rot ", input.leftGripOrientation, input.leftGripPoseActive);
+			rotationLine("Left aim rot  ", input.leftAimOrientation, input.leftAimPoseActive);
+			rotationLine("Right grip rot", input.rightGripOrientation, input.rightGripPoseActive);
+			rotationLine("Right aim rot ", input.rightAimOrientation, input.rightAimPoseActive);
 
 			ImGui::Separator();
 			ImGui::Text("Buttons");
@@ -1312,6 +1315,13 @@ public:
 	}
 
 private:
+	fe::OpenXR::InputState GetWorldInputState() const
+	{
+		const glm::vec3 playerPosition = player ? player->state.position : glm::vec3(0.0f);
+		const glm::quat playerRotation = glm::angleAxis(playerYaw, glm::vec3(0.0f, 1.0f, 0.0f));
+		return GetOpenXR().GetWorldInputState(playerPosition + positionOffset, playerRotation);
+	}
+
 	enum class Mode { Walking, Drone, Airplane };
 	Mode mode = Mode::Walking;
 
