@@ -163,14 +163,15 @@ public:
 	void UpdateControllerCubes(float dt)
 	{
 		const float baseScale = 1.0f;
-		const float growRate = 1.5f;
-		const float shrinkRate = 2.0f;
-		const float maxScale = 3.0f;
+		const float growRate = 0.2f;
+		const float shrinkRate = 0.5f;
+		const float maxScale = 1.35f;
 		const float cubeHalfExtent = 0.08f;
 
 		auto updateCube = [&](const std::shared_ptr<fe::Object>& cube,
-							  const glm::vec3& gripPos, bool poseActive,
-							  float& scale, bool& touching, fe::OpenXR::Hand hand)
+							  const glm::vec3& gripPos, const glm::quat& gripOrientation,
+							  bool poseActive, float& scale, bool& touching,
+							  int handIndex, fe::OpenXR::Hand hand)
 		{
 			if (!cube)
 				return;
@@ -183,18 +184,20 @@ public:
 			}
 
 			cube->SetPosition(gripPos);
+			cube->SetOrientation(gripOrientation);
 
 			const float reach = cubeHalfExtent * scale + ballRadius_;
 			const bool hit = ballObject_ &&
 				glm::length(gripPos - ballObject_->state.position) <= reach;
 
-			if (hit)
+			const bool grabbedByThis = ballGrabbedBy_ == handIndex;
+			if (hit && !grabbedByThis)
 			{
 				scale = std::min(scale + growRate * dt, maxScale);
 				if (!touching)
-					GetOpenXR().TriggerHaptic(hand, 0.7f, 0.08f);
+					GetOpenXR().TriggerHaptic(hand, 0.35f, 0.06f);
 			}
-			else
+			else if (!hit)
 			{
 				scale = std::max(scale - shrinkRate * dt, baseScale);
 			}
@@ -203,10 +206,51 @@ public:
 			cube->SetScale(glm::vec3(scale));
 		};
 
-		updateCube(leftControllerObject_, leftGripPosition, leftGripPoseActive,
-				   leftControllerScale_, leftTouchingBall_, fe::OpenXR::Hand::Left);
-		updateCube(rightControllerObject_, rightGripPosition, rightGripPoseActive,
-				   rightControllerScale_, rightTouchingBall_, fe::OpenXR::Hand::Right);
+		updateCube(leftControllerObject_, leftGripPosition, leftGripOrientation,
+				   leftGripPoseActive, leftControllerScale_, leftTouchingBall_,
+				   0, fe::OpenXR::Hand::Left);
+		updateCube(rightControllerObject_, rightGripPosition, rightGripOrientation,
+				   rightGripPoseActive, rightControllerScale_, rightTouchingBall_,
+				   1, fe::OpenXR::Hand::Right);
+
+		if (!ballObject_)
+			return;
+
+		const bool leftGrip = GetOpenXR().IsGripPressed(fe::OpenXR::Hand::Left);
+		const bool rightGrip = GetOpenXR().IsGripPressed(fe::OpenXR::Hand::Right);
+
+		// Release when the grabbing hand lets go; the ball stays where it is.
+		if (ballGrabbedBy_ == 0 && !leftGrip)
+			ballGrabbedBy_ = -1;
+		else if (ballGrabbedBy_ == 1 && !rightGrip)
+			ballGrabbedBy_ = -1;
+
+		if (ballGrabbedBy_ < 0)
+		{
+			// Grab when gripping a hand that is touching the ball.
+			if (leftGrip && leftTouchingBall_ && leftGripPoseActive)
+			{
+				ballGrabbedBy_ = 0;
+				ballGrabOffset_ = ballObject_->state.position - leftGripPosition;
+				GetOpenXR().TriggerHaptic(fe::OpenXR::Hand::Left, 0.8f, 0.1f);
+			}
+			else if (rightGrip && rightTouchingBall_ && rightGripPoseActive)
+			{
+				ballGrabbedBy_ = 1;
+				ballGrabOffset_ = ballObject_->state.position - rightGripPosition;
+				GetOpenXR().TriggerHaptic(fe::OpenXR::Hand::Right, 0.8f, 0.1f);
+			}
+		}
+		else
+		{
+			// Keep the grabbed ball attached to the hand.
+			const bool active = ballGrabbedBy_ == 0 ? leftGripPoseActive : rightGripPoseActive;
+			if (active)
+			{
+				const glm::vec3 handPos = ballGrabbedBy_ == 0 ? leftGripPosition : rightGripPosition;
+				ballObject_->SetPosition(handPos + ballGrabOffset_);
+			}
+		}
 	}
 
 	void RebuildPlayerPhysicsBody()
@@ -934,10 +978,38 @@ public:
 				else
 					ImGui::TextDisabled("%s  (not tracked)", label);
 			};
+			auto rotationLine = [](const char* label, const glm::quat& q, bool active)
+			{
+				if (active)
+					ImGui::Text("%s  qx %.2f  qy %.2f  qz %.2f  qw %.2f", label, q.x, q.y, q.z, q.w);
+				else
+					ImGui::TextDisabled("%s  (not tracked)", label);
+			};
 			poseLine("Left grip ", leftGripPosition, leftGripPoseActive);
 			poseLine("Left aim  ", leftAimPosition, leftAimPoseActive);
 			poseLine("Right grip", rightGripPosition, rightGripPoseActive);
 			poseLine("Right aim ", rightAimPosition, rightAimPoseActive);
+			rotationLine("Left grip rot ", leftGripOrientation, leftGripPoseActive);
+			rotationLine("Left aim rot  ", leftAimOrientation, leftAimPoseActive);
+			rotationLine("Right grip rot", rightGripOrientation, rightGripPoseActive);
+			rotationLine("Right aim rot ", rightAimOrientation, rightAimPoseActive);
+
+			ImGui::Separator();
+			ImGui::Text("Buttons");
+			auto heldLine = [](const char* label, bool down)
+			{
+				if (down)
+					ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "%s: DOWN", label);
+				else
+					ImGui::TextDisabled("%s: up", label);
+			};
+			heldLine("Toggle XR (A/X)", GetOpenXR().IsButtonHeld(fe::OpenXR::Button::ToggleXR));
+			heldLine("Left trigger (prev block)", GetOpenXR().IsButtonHeld(fe::OpenXR::Button::PreviousBlock));
+			heldLine("Right trigger (next block)", GetOpenXR().IsButtonHeld(fe::OpenXR::Button::NextBlock));
+			heldLine("Left squeeze (grip)", GetOpenXR().IsGripPressed(fe::OpenXR::Hand::Left));
+			heldLine("Right squeeze (grip)", GetOpenXR().IsGripPressed(fe::OpenXR::Hand::Right));
+			ImGui::Text("Ball grabbed by: %s",
+				ballGrabbedBy_ < 0 ? "none" : (ballGrabbedBy_ == 0 ? "left" : "right"));
 			ImGui::End();
 		}
 
@@ -1065,6 +1137,8 @@ private:
 	float rightControllerScale_ = 1.0f;
 	bool leftTouchingBall_ = false;
 	bool rightTouchingBall_ = false;
+	int ballGrabbedBy_ = -1;
+	glm::vec3 ballGrabOffset_{0.0f};
 
 	float airplaneThrottle = 0.0f;
 	float airplaneAirSpeed = 0.0f;
