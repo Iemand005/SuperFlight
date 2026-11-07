@@ -17,6 +17,7 @@
 #include <Object.hpp>
 #include <Character.hpp>
 #include <Primitives.hpp>
+#include <components/Drone.hpp>
 #include <physics/PhysicsVehicle.hpp>
 #include <vr/OpenXR.hpp>
 
@@ -72,7 +73,7 @@ public:
 		switch (mode)
 		{
 		case Mode::Walking:  WalkingUpdate(GetWindow<fe::SDLWindow>(), dt); break;
-		case Mode::Drone:    if (droneBody_)    DroneUpdate(GetWindow<fe::SDLWindow>(), dt); break;
+		case Mode::Drone:    if (drone_ && drone_->IsActive()) DroneUpdate(GetWindow<fe::SDLWindow>(), dt); break;
 		case Mode::Airplane: if (airplaneBody_) AirplaneUpdate(GetWindow<fe::SDLWindow>(), dt); break;
 		}
 
@@ -100,7 +101,7 @@ public:
 		switch (mode)
 		{
 		case Mode::Walking:  RespawnIfFell(); SyncCameraToPlayer(); break;
-		case Mode::Drone:    if (droneBody_)    camera->SetPos(droneBody_->GetPosition()); break;
+		case Mode::Drone:    if (drone_ && drone_->IsActive()) camera->SetPos(drone_->GetBody()->GetPosition()); break;
 		case Mode::Airplane: if (airplaneBody_) AirplaneCameraUpdate(); break;
 		}
 
@@ -505,17 +506,9 @@ public:
 
 	void CreateParkedVehicles()
 	{
-		// Parked drone: a plain cube, static until the player climbs in.
-		droneObject_ = std::make_shared<fe::Object>(fe::Primitives::GenerateCube(
-			{fe::PlaneDirection::Front, fe::PlaneDirection::Back,
-			 fe::PlaneDirection::Left, fe::PlaneDirection::Right,
-			 fe::PlaneDirection::Top, fe::PlaneDirection::Bottom},
-			0.6f));
-		droneObject_->name = "Drone";
-		droneObject_->color = glm::vec3(1.0f, 0.45f, 0.0f);
-		droneObject_->state.position = droneSpawn;
-		droneObject_->isStatic = true;
-		scene->AddObject(droneObject_);
+		drone_ = std::make_unique<fe::Drone>();
+		if (!drone_->Spawn(*scene, droneSpawn))
+			throw std::runtime_error("Failed to spawn the SuperFlight demo drone");
 
 		// Parked airplane: same mesh used when flying, just inert for now.
 		airplaneObject_ = std::make_shared<fe::Object>(BuildAirplaneMesh());
@@ -539,26 +532,12 @@ public:
 		if (mode != Mode::Walking)
 			ExitVehicle();
 		auto *physics = GetPhysicsFactory();
-		if (!physics || !droneObject_)
+		if (!physics || !drone_ || !drone_->IsSpawned())
 			return;
 
-		if (!droneBody_)
-		{
-			droneObject_->SetPhysicsObject(physics->CreateSphereObject(0.3f, true));
-			droneBody_ = droneObject_->physicsObject.get();
-			if (droneBody_)
-			{
-				droneBody_->SetPosition(droneObject_->state.position);
-				droneBody_->SetRotation(droneObject_->state.orientation);
-				droneBody_->SetLinearVelocity(glm::vec3(0.0f));
-				droneBody_->SetAngularVelocity(glm::vec3(0.0f));
-				droneBody_->SetDamping(droneLinearDamping, droneAngularDamping);
-			}
-		}
-
-		droneObject_->isStatic = false;
+		if (!drone_->Enter(*physics))
+			return;
 		mode = Mode::Drone;
-		droneThrottle = 0.0f;
 		GetWindow<fe::SDLWindow>()->StartMouseCapture();
 	}
 
@@ -597,11 +576,10 @@ public:
 	{
 		fe::Object *vehicle = nullptr;
 
-		if (mode == Mode::Drone && droneObject_)
+		if (mode == Mode::Drone && drone_ && drone_->IsSpawned())
 		{
-			vehicle = droneObject_.get();
-			droneObject_->SetPhysicsObject(nullptr); // destructor removes the Jolt body
-			droneBody_ = nullptr;
+			vehicle = drone_->GetObject().get();
+			drone_->Exit();
 		}
 		else if (mode == Mode::Airplane && airplaneObject_)
 		{
@@ -693,37 +671,23 @@ public:
 
 	void DroneUpdate(fe::SDLWindow *window, float dt)
 	{
-		droneBody_->SetDamping(droneLinearDamping, droneAngularDamping);
-
-		if (window->IsKeyDown(SDL_SCANCODE_LEFT))  camera->yaw -= droneYawSpeed * dt;
-		if (window->IsKeyDown(SDL_SCANCODE_RIGHT)) camera->yaw += droneYawSpeed * dt;
-		if (window->IsKeyDown(SDL_SCANCODE_UP))    camera->pitch += dronePitchSpeed * dt;
-		if (window->IsKeyDown(SDL_SCANCODE_DOWN))  camera->pitch -= dronePitchSpeed * dt;
-		camera->pitch = std::clamp(camera->pitch, -dronePitchLimit, dronePitchLimit);
+		if (window->IsKeyDown(SDL_SCANCODE_LEFT))  camera->yaw -= droneCameraYawSpeed * dt;
+		if (window->IsKeyDown(SDL_SCANCODE_RIGHT)) camera->yaw += droneCameraYawSpeed * dt;
+		if (window->IsKeyDown(SDL_SCANCODE_UP))    camera->pitch += droneCameraPitchSpeed * dt;
+		if (window->IsKeyDown(SDL_SCANCODE_DOWN))  camera->pitch -= droneCameraPitchSpeed * dt;
+		camera->pitch = std::clamp(camera->pitch, -droneCameraPitchLimit, droneCameraPitchLimit);
 		camera->UpdateDirection();
 
-		float yawRad = glm::radians(camera->yaw);
-		glm::vec3 forward(cosf(yawRad), 0.0f, sinf(yawRad));
-		forward = glm::normalize(forward);
-		glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0.0f, 1.0f, 0.0f)));
+		glm::vec2 horizontalInput(0.0f);
+		if (window->IsKeyDown(SDL_SCANCODE_A)) horizontalInput.x -= 1.0f;
+		if (window->IsKeyDown(SDL_SCANCODE_D)) horizontalInput.x += 1.0f;
+		if (window->IsKeyDown(SDL_SCANCODE_S)) horizontalInput.y -= 1.0f;
+		if (window->IsKeyDown(SDL_SCANCODE_W)) horizontalInput.y += 1.0f;
 
-		glm::vec3 accel(0.0f);
-		if (window->IsKeyDown(SDL_SCANCODE_W)) accel += forward;
-		if (window->IsKeyDown(SDL_SCANCODE_S)) accel -= forward;
-		if (window->IsKeyDown(SDL_SCANCODE_D)) accel += right;
-		if (window->IsKeyDown(SDL_SCANCODE_A)) accel -= right;
-
-		float horizontal = glm::length(accel);
-		if (horizontal > 0.0f)
-			accel = (accel / horizontal) * droneThrust;
-
-		float vertical = 0.0f;
-		if (droneAltitudeHold) vertical += droneGravity;
-		if (window->IsKeyDown(SDL_SCANCODE_SPACE))  vertical += droneLift;
-		if (window->IsKeyDown(SDL_SCANCODE_LSHIFT)) vertical -= droneLift;
-
-		glm::vec3 force = accel + glm::vec3(0.0f, vertical, 0.0f);
-		droneBody_->AddForce(force);
+		float verticalInput = 0.0f;
+		if (window->IsKeyDown(SDL_SCANCODE_SPACE))  verticalInput += 1.0f;
+		if (window->IsKeyDown(SDL_SCANCODE_LSHIFT)) verticalInput -= 1.0f;
+		drone_->Update(horizontalInput, verticalInput, glm::radians(camera->yaw));
 	}
 
 	void AirplaneDriveUpdate(fe::SDLWindow *window)
@@ -844,7 +808,9 @@ public:
 		fe::Object *best = nullptr;
 		float bestT = std::numeric_limits<float>::max();
 
-		fe::Object *candidates[2] = {droneObject_.get(), airplaneObject_.get()};
+		fe::Object *candidates[2] = {
+			drone_ ? drone_->GetObject().get() : nullptr,
+			airplaneObject_.get()};
 		for (fe::Object *obj : candidates)
 		{
 			if (!obj)
@@ -863,7 +829,7 @@ public:
 			}
 		}
 
-		if (best == droneObject_.get())
+		if (drone_ && best == drone_->GetObject().get())
 			EnterDrone();
 		else if (best == airplaneObject_.get())
 			EnterAirplane();
@@ -1251,18 +1217,19 @@ public:
 
 		if (ImGui::CollapsingHeader("Drone", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			ImGui::Checkbox("Altitude hold", &droneAltitudeHold);
-			ImGui::SliderFloat("Thrust", &droneThrust, 0.0f, 80.0f, "%.1f m/s2");
-			ImGui::SliderFloat("Lift", &droneLift, 0.0f, 60.0f, "%.1f m/s2");
-			ImGui::SliderFloat("Yaw Speed", &droneYawSpeed, 10.0f, 360.0f, "%.0f deg/s");
-			ImGui::SliderFloat("Pitch Speed", &dronePitchSpeed, 10.0f, 360.0f, "%.0f deg/s");
-			ImGui::SliderFloat("Linear Damping", &droneLinearDamping, 0.0f, 5.0f);
-			ImGui::SliderFloat("Angular Damping", &droneAngularDamping, 0.0f, 10.0f);
+			auto& settings = drone_->GetSettings();
+			ImGui::Checkbox("Altitude hold", &settings.altitudeHold);
+			ImGui::SliderFloat("Thrust", &settings.thrust, 0.0f, 80.0f, "%.1f m/s2");
+			ImGui::SliderFloat("Lift", &settings.lift, 0.0f, 60.0f, "%.1f m/s2");
+			ImGui::SliderFloat("Yaw Speed", &droneCameraYawSpeed, 10.0f, 360.0f, "%.0f deg/s");
+			ImGui::SliderFloat("Pitch Speed", &droneCameraPitchSpeed, 10.0f, 360.0f, "%.0f deg/s");
+			ImGui::SliderFloat("Linear Damping", &settings.linearDamping, 0.0f, 5.0f);
+			ImGui::SliderFloat("Angular Damping", &settings.angularDamping, 0.0f, 10.0f);
 			ImGui::TextDisabled("W/S forward-back (level), A/D strafe, Space up, Shift down");
 			ImGui::TextDisabled("Arrows: yaw/pitch. Mouse: FPV look.");
-			if (droneBody_)
+			if (drone_ && drone_->GetBody())
 			{
-				glm::vec3 v = droneBody_->GetLinearVelocity();
+				glm::vec3 v = drone_->GetBody()->GetLinearVelocity();
 				ImGui::Text("Speed: %.1f m/s", glm::length(v));
 			}
 		}
@@ -1334,16 +1301,9 @@ private:
 	float walkSpeed = 25.0f;
 	float sprintSpeed = 40.0f;
 
-	float droneThrust = 30.0f;
-	float droneLift = 18.0f;
-	float droneYawSpeed = 120.0f;
-	float dronePitchSpeed = 90.0f;
-	float dronePitchLimit = 60.0f;
-	float droneLinearDamping = 1.2f;
-	float droneAngularDamping = 4.0f;
-	float droneGravity = 20.0f; // counters the world gravity used for the strip
-	float droneThrottle = 0.0f;
-	bool droneAltitudeHold = true;
+	float droneCameraYawSpeed = 120.0f;
+	float droneCameraPitchSpeed = 90.0f;
+	float droneCameraPitchLimit = 60.0f;
 
 	std::unique_ptr<ChunkManager> chunkManager = std::make_unique<ChunkManager>(4);
 #ifdef FE_HAS_VULKAN
@@ -1354,8 +1314,7 @@ private:
 	int chunkOutgenDistance = 1;
 	int physicsDistance = 2;
 
-	std::shared_ptr<fe::Object> droneObject_;
-	fe::PhysicsObject *droneBody_ = nullptr;
+	std::unique_ptr<fe::Drone> drone_;
 
 	std::shared_ptr<fe::Object> leftControllerObject_;
 	std::shared_ptr<fe::Object> rightControllerObject_;
