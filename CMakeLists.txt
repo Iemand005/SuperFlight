@@ -21,6 +21,8 @@ set(KISSFFT_STATIC ON CACHE BOOL "Build static library" FORCE)
 
 set(FE_EXCLUDE_JOLT OFF CACHE BOOL "Disable JOLT" FORCE)
 
+option(SUPERFLIGHT_USE_VULKAN "Use Vulkan for SuperFlight rendering" OFF)
+
 set(ENGINE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../FenixEngine")
 
 if(CMAKE_CONFIGURATION_TYPES)
@@ -87,11 +89,18 @@ target_link_libraries(${SUPERFLIGHT_TARGET} PRIVATE
 	Engine
 )
 
+if(SUPERFLIGHT_USE_VULKAN AND (ANDROID OR EMSCRIPTEN OR FE_EXCLUDE_VULKAN))
+	message(FATAL_ERROR "SUPERFLIGHT_USE_VULKAN requires the desktop Vulkan backend.")
+endif()
+
 # The Engine defines FE_HAS_VULKAN inside its own directory, so those defines do
-# not reach this sibling target. SuperFlight renders through the Vulkan backend,
-# so its translation units (engine inline headers) must see the same define.
+# not reach this sibling target. Keep the backend available to game code even
+# when OpenGL is selected as the active renderer.
 if(NOT ANDROID AND NOT EMSCRIPTEN AND NOT FE_EXCLUDE_VULKAN)
 	target_compile_definitions(${SUPERFLIGHT_TARGET} PRIVATE FE_HAS_VULKAN)
+endif()
+if(SUPERFLIGHT_USE_VULKAN)
+	target_compile_definitions(${SUPERFLIGHT_TARGET} PRIVATE SUPERFLIGHT_USE_VULKAN)
 endif()
 
 target_precompile_headers(${SUPERFLIGHT_TARGET} PRIVATE
@@ -131,59 +140,61 @@ if(NOT ANDROID)
 		COMMENT "Copying SuperFlight resources to ${RESOURCE_OUT_DIR}"
 	)
 
-	if(Vulkan_GLSLC_EXECUTABLE AND EXISTS "${Vulkan_GLSLC_EXECUTABLE}")
-		set(GLSLC "${Vulkan_GLSLC_EXECUTABLE}")
-	else()
-		if(GLSLC AND NOT EXISTS "${GLSLC}")
-			unset(GLSLC CACHE)
-		endif()
-		find_program(GLSLC glslc HINTS
-			$ENV{VULKAN_SDK}/Bin
-			$ENV{VULKAN_SDK}/bin
-		)
-	endif()
-
-	if(GLSLC)
-		message(STATUS "Found glslc: ${GLSLC}")
-
-		set(SHADER_SRC_DIR ${RESOURCE_SRC_DIR}/shaders)
-		set(SHADER_OUT_DIR ${RESOURCE_OUT_DIR}/shaders)
-		file(MAKE_DIRECTORY ${SHADER_OUT_DIR})
-
-		set(SHADER_SOURCES
-			${SHADER_SRC_DIR}/VertexShader_vk.glsl
-			${SHADER_SRC_DIR}/FragmentShader_vk.glsl
-			${SHADER_SRC_DIR}/VertexShader_vk_foxcraft.glsl
-			${SHADER_SRC_DIR}/FragmentShader_vk_array.glsl
-		)
-
-		foreach(SHADER ${SHADER_SOURCES})
-			get_filename_component(SHADER_NAME ${SHADER} NAME_WE)
-
-			if(${SHADER_NAME} MATCHES ".*Fragment.*")
-				set(SHADER_STAGE frag)
-			else()
-				set(SHADER_STAGE vert)
+	if(SUPERFLIGHT_USE_VULKAN)
+		if(Vulkan_GLSLC_EXECUTABLE AND EXISTS "${Vulkan_GLSLC_EXECUTABLE}")
+			set(GLSLC "${Vulkan_GLSLC_EXECUTABLE}")
+		else()
+			if(GLSLC AND NOT EXISTS "${GLSLC}")
+				unset(GLSLC CACHE)
 			endif()
+			find_program(GLSLC glslc HINTS
+				$ENV{VULKAN_SDK}/Bin
+				$ENV{VULKAN_SDK}/bin
+			)
+		endif()
 
-			set(SPIRV_OUTPUT ${SHADER_OUT_DIR}/${SHADER_NAME}.spv)
+		if(GLSLC)
+			message(STATUS "Found glslc: ${GLSLC}")
 
-			add_custom_command(
-				OUTPUT ${SPIRV_OUTPUT}
-				COMMAND ${GLSLC} -fshader-stage=${SHADER_STAGE} --target-env=vulkan1.0 -DFE_VULKAN ${SHADER} -o ${SPIRV_OUTPUT}
-				DEPENDS ${SHADER}
-				COMMENT "Compiling ${SHADER_NAME} -> ${SHADER_NAME}.spv"
-				VERBATIM
+			set(SHADER_SRC_DIR ${RESOURCE_SRC_DIR}/shaders)
+			set(SHADER_OUT_DIR ${RESOURCE_OUT_DIR}/shaders)
+			file(MAKE_DIRECTORY ${SHADER_OUT_DIR})
+
+			set(SHADER_SOURCES
+				${SHADER_SRC_DIR}/VertexShader_vk.glsl
+				${SHADER_SRC_DIR}/FragmentShader_vk.glsl
+				${SHADER_SRC_DIR}/VertexShader_vk_foxcraft.glsl
+				${SHADER_SRC_DIR}/FragmentShader_vk_array.glsl
 			)
 
-			list(APPEND SPIRV_OUTPUTS ${SPIRV_OUTPUT})
-		endforeach()
+			foreach(SHADER ${SHADER_SOURCES})
+				get_filename_component(SHADER_NAME ${SHADER} NAME_WE)
 
-		add_custom_target(SPIRV_ShadersSuperFlight ALL DEPENDS ${SPIRV_OUTPUTS})
-		add_dependencies(SPIRV_ShadersSuperFlight CopyResources_SuperFlight)
-		add_dependencies(${SUPERFLIGHT_TARGET} SPIRV_ShadersSuperFlight)
-	else()
-		message(WARNING "glslc not found - SuperFlight shader compilation skipped. Set VULKAN_SDK environment variable.")
+				if(${SHADER_NAME} MATCHES ".*Fragment.*")
+					set(SHADER_STAGE frag)
+				else()
+					set(SHADER_STAGE vert)
+				endif()
+
+				set(SPIRV_OUTPUT ${SHADER_OUT_DIR}/${SHADER_NAME}.spv)
+
+				add_custom_command(
+					OUTPUT ${SPIRV_OUTPUT}
+					COMMAND ${GLSLC} -fshader-stage=${SHADER_STAGE} --target-env=vulkan1.0 -DFE_VULKAN ${SHADER} -o ${SPIRV_OUTPUT}
+					DEPENDS ${SHADER}
+					COMMENT "Compiling ${SHADER_NAME} -> ${SHADER_NAME}.spv"
+					VERBATIM
+				)
+
+				list(APPEND SPIRV_OUTPUTS ${SPIRV_OUTPUT})
+			endforeach()
+
+			add_custom_target(SPIRV_ShadersSuperFlight ALL DEPENDS ${SPIRV_OUTPUTS})
+			add_dependencies(SPIRV_ShadersSuperFlight CopyResources_SuperFlight)
+			add_dependencies(${SUPERFLIGHT_TARGET} SPIRV_ShadersSuperFlight)
+		else()
+			message(FATAL_ERROR "SUPERFLIGHT_USE_VULKAN requires glslc. Set VULKAN_SDK or install the Vulkan SDK.")
+		endif()
 	endif()
 
 	# Keep resources next to the executable too, so SDL_GetBasePath() resolves the
