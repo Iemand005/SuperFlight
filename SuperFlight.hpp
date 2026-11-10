@@ -88,6 +88,7 @@ public:
 		case Mode::Drone:    if (drone_ && drone_->IsActive()) DroneUpdate(GetWindow<fe::SDLWindow>(), dt); break;
 		case Mode::Airplane: if (_airplaneBody) AirplaneUpdate(GetWindow<fe::SDLWindow>(), dt); break;
 		}
+		
 
 		UpdateLoadedChunks();
 
@@ -166,7 +167,7 @@ public:
 
 		addLanePart("ThrowingLaneFloor", glm::vec3(0.38f, 0.40f, 0.43f),
 					glm::vec3(15.0f, 0.2f, 80.0f),
-					laneCenter + glm::vec3(0.0f, 29.9f, 0.0f));
+					laneCenter + glm::vec3(0.0f, 30.1f, 0.10f));
 		addLanePart("ThrowingLaneLeftWall", glm::vec3(0.26f, 0.30f, 0.34f),
 					glm::vec3(0.2f, 0.8f, 80.0f),
 					laneCenter + glm::vec3(-7.4f, 30.4f, 0.0f));
@@ -647,6 +648,9 @@ public:
 		if (window->IsKeyDown(SDL_SCANCODE_D)) player->Move(fe::Direction::Right, camera.get());
 		if (window->IsKeyDown(SDL_SCANCODE_SPACE)) player->Move(fe::Direction::Up, camera.get());
 		if (window->IsKeyDown(SDL_SCANCODE_LSHIFT)) player->Move(fe::Direction::Down, camera.get());
+
+		if (window->IsKeyDown(SDL_SCANCODE_B)) CreateBall();
+
 	}
 
 	void SyncCameraToPlayer()
@@ -690,7 +694,6 @@ public:
 		if (window->IsKeyDown(SDL_SCANCODE_S)) horizontalInput.y -= 1.0f;
 		if (window->IsKeyDown(SDL_SCANCODE_W)) horizontalInput.y += 1.0f;
 
-		if (window->IsKeyDown(SDL_SCANCODE_B)) CreateBall();
 
 		float verticalInput = 0.0f;
 		if (window->IsKeyDown(SDL_SCANCODE_SPACE))  verticalInput += 1.0f;
