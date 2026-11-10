@@ -179,11 +179,7 @@ public:
 	{
 		const fe::OpenXR::InputState input = GetWorldInputState();
 		
-		_leftControllerObject = std::make_shared<fe::Object>(fe::Primitives::GenerateCube(
-			{fe::PlaneDirection::Front, fe::PlaneDirection::Back,
-			 fe::PlaneDirection::Left, fe::PlaneDirection::Right,
-			 fe::PlaneDirection::Top, fe::PlaneDirection::Bottom},
-			0.08f));
+		_leftControllerObject = std::make_shared<fe::Object>(fe::Primitives::GenerateCube(0.08f));
 		_leftControllerObject->name = "LeftController";
 		_leftControllerObject->color = glm::vec3(0.2f, 0.8f, 1.0f);
 		_leftControllerObject->state.position = playerSpawn + glm::vec3(-0.25f, 1.2f, -0.3f);
