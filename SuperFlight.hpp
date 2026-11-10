@@ -203,7 +203,7 @@ public:
 
 	void CreateBall()
 	{
-		_ballObject = std::make_shared<fe::Object>(fe::Primitives::GenerateSphere(ballRadius_, 24, 16));
+		_ballObject = std::make_shared<fe::Object>(fe::Primitives::GenerateSphere(_ballRadius, 24, 16));
 		_ballObject->name = "XRBall";
 		_ballObject->color = glm::vec3(0.95f, 0.85f, 0.2f);
 		_ballObject->state.position = playerSpawn + glm::vec3(0.0f, 1.05f, -0.55f);
@@ -211,7 +211,7 @@ public:
 
 		if (auto *physics = GetPhysicsFactory())
 		{
-			auto body = physics->CreateSphereObject(ballRadius_, true);
+			auto body = physics->CreateSphereObject(_ballRadius, true);
 			if (body)
 			{
 				body->SetPosition(_ballObject->state.position);
@@ -246,13 +246,13 @@ public:
 		const glm::vec3 base = player ? player->state.position : playerSpawn;
 		const glm::vec3 spawnPos = base + glm::vec3(0.0f, 1.5f, 0.0f) + forward * 0.8f;
 
-		auto sphere = std::make_shared<fe::Object>(fe::Primitives::GenerateSphere(ballRadius_, 24, 16));
+		auto sphere = std::make_shared<fe::Object>(fe::Primitives::GenerateSphere(_ballRadius, 24, 16));
 		sphere->name = "XRSphere";
 		sphere->color = glm::vec3(0.3f, 0.85f, 0.45f);
 		sphere->state.position = spawnPos;
 		sphere->isStatic = false;
 
-		auto body = physics->CreateSphereObject(ballRadius_, true);
+		auto body = physics->CreateSphereObject(_ballRadius, true);
 		if (body)
 		{
 			body->SetPosition(spawnPos);
@@ -331,7 +331,7 @@ public:
 			{
 				if (!obj)
 					continue;
-				const float reach = cubeHalfExtent * scale + ballRadius_ * obj->state.scale.x;
+				const float reach = cubeHalfExtent * scale + _ballRadius * obj->state.scale.x;
 				const float dist = glm::length(gripPos - obj->state.position);
 				if (dist <= reach && dist < bestDist)
 				{
@@ -1332,7 +1332,7 @@ private:
 	std::shared_ptr<fe::Object> _rightControllerObject;
 	std::shared_ptr<fe::Object> _ballObject;
 	std::vector<std::shared_ptr<fe::Object>> _grabbableObjects;
-	float ballRadius_ = 0.25f;
+	float _ballRadius = 0.25f;
 	float leftControllerScale_ = 1.0f;
 	float rightControllerScale_ = 1.0f;
 	bool leftTouchingObject_ = false;
