@@ -139,6 +139,7 @@ if(NOT ANDROID)
 		COMMAND ${CMAKE_COMMAND} -E copy_directory ${RESOURCE_SRC_DIR} ${RESOURCE_OUT_DIR}
 		COMMENT "Copying SuperFlight resources to ${RESOURCE_OUT_DIR}"
 	)
+	add_dependencies(${SUPERFLIGHT_TARGET} CopyResources_SuperFlight)
 
 	if(SUPERFLIGHT_USE_VULKAN)
 		if(Vulkan_GLSLC_EXECUTABLE AND EXISTS "${Vulkan_GLSLC_EXECUTABLE}")
