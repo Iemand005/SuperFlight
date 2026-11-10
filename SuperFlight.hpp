@@ -178,8 +178,7 @@ public:
 	void CreateControllerCubes()
 	{
 		const fe::OpenXR::InputState input = GetWorldInputState();
-		// Two small cubes that follow the XR controllers each frame (grip
-		// pose) so hand tracking is visible both on screen and in the HMD.
+		
 		_leftControllerObject = std::make_shared<fe::Object>(fe::Primitives::GenerateCube(
 			{fe::PlaneDirection::Front, fe::PlaneDirection::Back,
 			 fe::PlaneDirection::Left, fe::PlaneDirection::Right,
