@@ -191,11 +191,7 @@ public:
 		_leftControllerObject->visible = input.leftGripPoseActive;
 		scene->AddObject(_leftControllerObject);
 
-		_rightControllerObject = std::make_shared<fe::Object>(fe::Primitives::GenerateCube(
-			{fe::PlaneDirection::Front, fe::PlaneDirection::Back,
-			 fe::PlaneDirection::Left, fe::PlaneDirection::Right,
-			 fe::PlaneDirection::Top, fe::PlaneDirection::Bottom},
-			0.08f));
+		_rightControllerObject = std::make_shared<fe::Object>(fe::Primitives::GenerateCube(0.08f));
 		_rightControllerObject->name = "RightController";
 		_rightControllerObject->color = glm::vec3(1.0f, 0.5f, 0.1f);
 		_rightControllerObject->state.position = playerSpawn + glm::vec3(0.25f, 1.2f, -0.3f);
