@@ -86,7 +86,7 @@ public:
 		{
 		case Mode::Walking:  WalkingUpdate(GetWindow<fe::SDLWindow>(), dt); break;
 		case Mode::Drone:    if (drone_ && drone_->IsActive()) DroneUpdate(GetWindow<fe::SDLWindow>(), dt); break;
-		case Mode::Airplane: if (airplaneBody_) AirplaneUpdate(GetWindow<fe::SDLWindow>(), dt); break;
+		case Mode::Airplane: if (_airplaneBody) AirplaneUpdate(GetWindow<fe::SDLWindow>(), dt); break;
 		}
 
 		UpdateLoadedChunks();
@@ -115,7 +115,7 @@ public:
 		{
 		case Mode::Walking:  RespawnIfFell(); SyncCameraToPlayer(); break;
 		case Mode::Drone:    if (drone_ && drone_->IsActive()) camera->SetPos(drone_->GetBody()->GetPosition()); break;
-		case Mode::Airplane: if (airplaneBody_) AirplaneCameraUpdate(); break;
+		case Mode::Airplane: if (_airplaneBody) AirplaneCameraUpdate(); break;
 		}
 
 		Redraw();
@@ -533,8 +533,6 @@ public:
 		airplaneGearObject_ = airplaneObject_->AddChild(std::move(gear));
 	}
 
-	// ------------------------------------------------------------ vehicle I/O
-
 	void EnterDrone()
 	{
 		if (mode != Mode::Walking)
@@ -557,17 +555,17 @@ public:
 		if (!physics || !airplaneObject_)
 			return;
 
-		if (!airplaneBody_)
+		if (!_airplaneBody)
 		{
 			airplaneObject_->SetPhysicsObject(physics->CreateObject(glm::vec3(3.6f, 1.4f, 3.2f), true, true));
-			airplaneBody_ = airplaneObject_->physicsObject.get();
-			if (airplaneBody_)
+			_airplaneBody = airplaneObject_->physicsObject.get();
+			if (_airplaneBody)
 			{
-				airplaneBody_->SetPosition(airplaneObject_->state.position);
-				airplaneBody_->SetRotation(airplaneObject_->state.orientation);
-				airplaneBody_->SetDamping(0.0f, 0.0f);
-				airplaneBody_->SetAngularVelocity(glm::vec3(0.0f));
-				airplaneBody_->SetLinearVelocity(glm::vec3(0.0f));
+				_airplaneBody->SetPosition(airplaneObject_->state.position);
+				_airplaneBody->SetRotation(airplaneObject_->state.orientation);
+				_airplaneBody->SetDamping(0.0f, 0.0f);
+				_airplaneBody->SetAngularVelocity(glm::vec3(0.0f));
+				_airplaneBody->SetLinearVelocity(glm::vec3(0.0f));
 			}
 		}
 
@@ -575,8 +573,8 @@ public:
 		mode = Mode::Airplane;
 		airplaneThrottle = 0.0f;
 		airplaneAirSpeed = 0.0f;
-		airplaneGearDown = false;   // force SetAirplaneGear to actually apply
-		SetAirplaneGear(true);      // start on the wheels, ready to taxi
+		airplaneGearDown = false;
+		SetAirplaneGear(true);
 		GetWindow<fe::SDLWindow>()->StartMouseCapture();
 	}
 
@@ -594,8 +592,8 @@ public:
 			vehicle = airplaneObject_.get();
 			DestroyAirplaneVehicle();
 			airplaneObject_->SetPhysicsObject(nullptr);
-			airplaneBody_ = nullptr;
-			airplaneGearDown = true; // parked plane shows its gear again
+			_airplaneBody = nullptr;
+			airplaneGearDown = true;
 			if (airplaneGearObject_)
 				airplaneGearObject_->visible = true;
 		}
@@ -712,7 +710,7 @@ public:
 
 		airplaneVehicle_->SetDriverInput(forward, steer, brake, handbrake);
 		airplaneThrottle = forward > 0.0f ? forward : 0.0f;
-		airplaneAirSpeed = glm::length(airplaneBody_->GetLinearVelocity());
+		airplaneAirSpeed = glm::length(_airplaneBody->GetLinearVelocity());
 	}
 
 	void AirplaneUpdate(fe::SDLWindow *window, float dt)
@@ -725,7 +723,7 @@ public:
 			return;
 		}
 
-		airplaneBody_->SetDamping(0.0f, 0.0f);
+		_airplaneBody->SetDamping(0.0f, 0.0f);
 
 		float throttleInput = 0.0f;
 		if (window->IsKeyDown(SDL_SCANCODE_LSHIFT)) throttleInput += 1.0f;
@@ -741,7 +739,7 @@ public:
 		if (window->IsKeyDown(SDL_SCANCODE_E)) yawIn   -= 1.0f;
 		if (airplaneInvertPitch) pitchIn = -pitchIn;
 
-		glm::quat rot = airplaneBody_->GetRotation();
+		glm::quat rot = _airplaneBody->GetRotation();
 		glm::vec3 right = rot * glm::vec3(1.0f, 0.0f, 0.0f);
 		glm::vec3 up    = rot * glm::vec3(0.0f, 1.0f, 0.0f);
 		glm::vec3 fwd   = rot * glm::vec3(0.0f, 0.0f, 1.0f);
@@ -761,7 +759,7 @@ public:
 			if (glm::length(fwdH) > 1e-4f)
 				omega -= glm::cross(fwd, glm::normalize(fwdH)) * airplaneLevelStrength;
 		}
-		airplaneBody_->SetAngularVelocity(omega);
+		_airplaneBody->SetAngularVelocity(omega);
 
 		// Throttle drives the airspeed toward a target; gravity "sags" the plane
 		// when it is too slow (no lift), so stalls sink toward the ground.
@@ -771,13 +769,13 @@ public:
 		glm::vec3 velocity = fwd * airplaneAirSpeed;
 		float liftFactor = glm::clamp(airplaneAirSpeed / airplaneStallSpeed, 0.0f, 1.0f);
 		velocity.y -= airplaneGravitySag * (1.0f - liftFactor);
-		airplaneBody_->SetLinearVelocity(velocity);
+		_airplaneBody->SetLinearVelocity(velocity);
 	}
 
 	void AirplaneCameraUpdate()
 	{
-		glm::quat rot = airplaneBody_->GetRotation();
-		glm::vec3 pos = airplaneBody_->GetPosition();
+		glm::quat rot = _airplaneBody->GetRotation();
+		glm::vec3 pos = _airplaneBody->GetPosition();
 		glm::vec3 fwd = rot * glm::vec3(0.0f, 0.0f, 1.0f);
 		glm::vec3 up  = rot * glm::vec3(0.0f, 1.0f, 0.0f);
 
@@ -1111,11 +1109,11 @@ public:
 	void CreateAirplaneVehicle()
 	{
 		auto *physics = GetPhysicsFactory();
-		if (!physics || !airplaneBody_)
+		if (!physics || !_airplaneBody)
 			return;
 		if (airplaneVehicle_)
 			return;
-		airplaneVehicle_ = physics->CreateVehicle(airplaneBody_, BuildAirplaneWheels());
+		airplaneVehicle_ = physics->CreateVehicle(_airplaneBody, BuildAirplaneWheels());
 		if (airplaneVehicle_)
 			airplaneVehicle_->SetMaxPitchRollAngle(45.0f);
 	}
@@ -1145,8 +1143,8 @@ public:
 		{
 			// Switching from taxiing to flight: seed the airspeed from whatever
 			// ground speed we have so the plane does not stop dead.
-			if (airplaneBody_)
-				airplaneAirSpeed = glm::length(airplaneBody_->GetLinearVelocity());
+			if (_airplaneBody)
+				airplaneAirSpeed = glm::length(_airplaneBody->GetLinearVelocity());
 			DestroyAirplaneVehicle();
 		}
 	}
@@ -1272,9 +1270,9 @@ public:
 			ImGui::SliderFloat("Level Strength", &airplaneLevelStrength, 0.0f, 10.0f);
 			ImGui::SliderFloat("Cam Distance", &airplaneCamDistance, 2.0f, 40.0f);
 			ImGui::SliderFloat("Cam Height", &airplaneCamHeight, 0.0f, 20.0f);
-			if (airplaneBody_)
+			if (_airplaneBody)
 			{
-				glm::vec3 v = airplaneBody_->GetLinearVelocity();
+				glm::vec3 v = _airplaneBody->GetLinearVelocity();
 				ImGui::Text("Airspeed: %.1f m/s", airplaneAirSpeed);
 				ImGui::Text("Velocity: %.2f, %.2f, %.2f", v.x, v.y, v.z);
 			}
@@ -1371,7 +1369,7 @@ private:
 	bool airplaneChaseCam = true;
 
 	std::shared_ptr<fe::Object> airplaneObject_;
-	fe::PhysicsObject *airplaneBody_ = nullptr;
+	fe::PhysicsObject *_airplaneBody = nullptr;
 	fe::Object *airplaneGearObject_ = nullptr;
 	fe::PhysicsVehicle *airplaneVehicle_ = nullptr;
 	bool airplaneGearDown = true;
