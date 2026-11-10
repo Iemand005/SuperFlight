@@ -696,6 +696,8 @@ public:
 		if (window->IsKeyDown(SDL_SCANCODE_S)) horizontalInput.y -= 1.0f;
 		if (window->IsKeyDown(SDL_SCANCODE_W)) horizontalInput.y += 1.0f;
 
+		if (window->IsKeyDown(SKL_SCANCODE_B)) CreateBall();
+
 		float verticalInput = 0.0f;
 		if (window->IsKeyDown(SDL_SCANCODE_SPACE))  verticalInput += 1.0f;
 		if (window->IsKeyDown(SDL_SCANCODE_LSHIFT)) verticalInput -= 1.0f;
