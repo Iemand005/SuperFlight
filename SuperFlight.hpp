@@ -86,9 +86,9 @@ public:
 
 		switch (mode)
 		{
-		case Mode::Walking:  WalkingUpdate(window, dt); break;
-		case Mode::Drone:    if (drone_ && drone_->IsActive()) DroneUpdate(GetWindow<fe::SDLWindow>(), dt); break;
-		case Mode::Airplane: if (_airplaneBody) AirplaneUpdate(GetWindow<fe::SDLWindow>(), dt); break;
+			case Mode::Walking:  WalkingUpdate(window, dt); break;
+			case Mode::Drone:    if (drone_ && drone_->IsActive()) DroneUpdate(GetWindow<fe::SDLWindow>(), dt); break;
+			case Mode::Airplane: if (_airplaneBody) AirplaneUpdate(GetWindow<fe::SDLWindow>(), dt); break;
 		}
 
 		if (window->IsKeyDown(SDL_SCANCODE_B)) CreateBall();
