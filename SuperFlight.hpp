@@ -82,12 +82,16 @@ public:
 
 		const float dt = static_cast<float>(fpsCounter.deltaTime);
 
+		const auto &window = GetWindow<fe::SDLWindow>();
+
 		switch (mode)
 		{
-		case Mode::Walking:  WalkingUpdate(GetWindow<fe::SDLWindow>(), dt); break;
+		case Mode::Walking:  WalkingUpdate(window, dt); break;
 		case Mode::Drone:    if (drone_ && drone_->IsActive()) DroneUpdate(GetWindow<fe::SDLWindow>(), dt); break;
 		case Mode::Airplane: if (_airplaneBody) AirplaneUpdate(GetWindow<fe::SDLWindow>(), dt); break;
 		}
+
+		if (window->IsKeyDown(SDL_SCANCODE_B)) CreateBall();
 		
 
 		UpdateLoadedChunks();
@@ -648,9 +652,6 @@ public:
 		if (window->IsKeyDown(SDL_SCANCODE_D)) player->Move(fe::Direction::Right, camera.get());
 		if (window->IsKeyDown(SDL_SCANCODE_SPACE)) player->Move(fe::Direction::Up, camera.get());
 		if (window->IsKeyDown(SDL_SCANCODE_LSHIFT)) player->Move(fe::Direction::Down, camera.get());
-
-		if (window->IsKeyDown(SDL_SCANCODE_B)) CreateBall();
-
 	}
 
 	void SyncCameraToPlayer()
