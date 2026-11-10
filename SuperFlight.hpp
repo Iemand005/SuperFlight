@@ -103,7 +103,8 @@ public:
 
 		// The spawn button is polled during the previous RedrawVR, so consume it
 		// before the touch/grab pass runs.
-		HandleXRSpawning();
+		// TODO: I wanna move his into the XRGame class probably and call it in there as a virtual function the game can implement so it's guaranteed to fire at the right momentz
+		HandleXRInputs();
 
 		// Poses were polled during the previous RedrawVR; snap the controller
 		// cubes to them before drawing again.
@@ -228,7 +229,7 @@ public:
 		_grabbableObjects.push_back(_ballObject);
 	}
 
-	void HandleXRSpawning()
+	void HandleXRInputs()
 	{
 		if (GetOpenXR().ConsumeButtonPress(fe::OpenXR::Button::X))
 			SpawnSphere();
