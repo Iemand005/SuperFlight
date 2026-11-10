@@ -179,53 +179,53 @@ public:
 		const fe::OpenXR::InputState input = GetWorldInputState();
 		// Two small cubes that follow the XR controllers each frame (grip
 		// pose) so hand tracking is visible both on screen and in the HMD.
-		leftControllerObject_ = std::make_shared<fe::Object>(fe::Primitives::GenerateCube(
+		_leftControllerObject = std::make_shared<fe::Object>(fe::Primitives::GenerateCube(
 			{fe::PlaneDirection::Front, fe::PlaneDirection::Back,
 			 fe::PlaneDirection::Left, fe::PlaneDirection::Right,
 			 fe::PlaneDirection::Top, fe::PlaneDirection::Bottom},
 			0.08f));
-		leftControllerObject_->name = "LeftController";
-		leftControllerObject_->color = glm::vec3(0.2f, 0.8f, 1.0f);
-		leftControllerObject_->state.position = playerSpawn + glm::vec3(-0.25f, 1.2f, -0.3f);
-		leftControllerObject_->isStatic = true;
-		leftControllerObject_->visible = input.leftGripPoseActive;
-		scene->AddObject(leftControllerObject_);
+		_leftControllerObject->name = "LeftController";
+		_leftControllerObject->color = glm::vec3(0.2f, 0.8f, 1.0f);
+		_leftControllerObject->state.position = playerSpawn + glm::vec3(-0.25f, 1.2f, -0.3f);
+		_leftControllerObject->isStatic = true;
+		_leftControllerObject->visible = input.leftGripPoseActive;
+		scene->AddObject(_leftControllerObject);
 
-		rightControllerObject_ = std::make_shared<fe::Object>(fe::Primitives::GenerateCube(
+		_rightControllerObject = std::make_shared<fe::Object>(fe::Primitives::GenerateCube(
 			{fe::PlaneDirection::Front, fe::PlaneDirection::Back,
 			 fe::PlaneDirection::Left, fe::PlaneDirection::Right,
 			 fe::PlaneDirection::Top, fe::PlaneDirection::Bottom},
 			0.08f));
-		rightControllerObject_->name = "RightController";
-		rightControllerObject_->color = glm::vec3(1.0f, 0.5f, 0.1f);
-		rightControllerObject_->state.position = playerSpawn + glm::vec3(0.25f, 1.2f, -0.3f);
-		rightControllerObject_->isStatic = true;
-		rightControllerObject_->visible = input.rightGripPoseActive;
-		scene->AddObject(rightControllerObject_);
+		_rightControllerObject->name = "RightController";
+		_rightControllerObject->color = glm::vec3(1.0f, 0.5f, 0.1f);
+		_rightControllerObject->state.position = playerSpawn + glm::vec3(0.25f, 1.2f, -0.3f);
+		_rightControllerObject->isStatic = true;
+		_rightControllerObject->visible = input.rightGripPoseActive;
+		scene->AddObject(_rightControllerObject);
 	}
 
 	void CreateBall()
 	{
-		ballObject_ = std::make_shared<fe::Object>(fe::Primitives::GenerateSphere(ballRadius_, 24, 16));
-		ballObject_->name = "XRBall";
-		ballObject_->color = glm::vec3(0.95f, 0.85f, 0.2f);
-		ballObject_->state.position = playerSpawn + glm::vec3(0.0f, 1.05f, -0.55f);
-		ballObject_->isStatic = false;
+		_ballObject = std::make_shared<fe::Object>(fe::Primitives::GenerateSphere(ballRadius_, 24, 16));
+		_ballObject->name = "XRBall";
+		_ballObject->color = glm::vec3(0.95f, 0.85f, 0.2f);
+		_ballObject->state.position = playerSpawn + glm::vec3(0.0f, 1.05f, -0.55f);
+		_ballObject->isStatic = false;
 
 		if (auto *physics = GetPhysicsFactory())
 		{
 			auto body = physics->CreateSphereObject(ballRadius_, true);
 			if (body)
 			{
-				body->SetPosition(ballObject_->state.position);
+				body->SetPosition(_ballObject->state.position);
 				body->SetLinearVelocity(glm::vec3(0.0f));
 				body->SetAngularVelocity(glm::vec3(0.0f));
 			}
-			ballObject_->SetPhysicsObject(std::move(body));
+			_ballObject->SetPhysicsObject(std::move(body));
 		}
 
-		scene->AddObject(ballObject_);
-		grabbableObjects_.push_back(ballObject_);
+		scene->AddObject(_ballObject);
+		grabbableObjects_.push_back(_ballObject);
 	}
 
 	void HandleXRSpawning()
@@ -381,10 +381,10 @@ public:
 			cube->SetScale(glm::vec3(scale));
 		};
 
-		updateCube(leftControllerObject_, input.leftGripPosition, input.leftGripOrientation,
+		updateCube(_leftControllerObject, input.leftGripPosition, input.leftGripOrientation,
 				   input.leftGripPoseActive, leftControllerScale_, leftTouchingObject_,
 				   0, fe::OpenXR::Hand::Left);
-		updateCube(rightControllerObject_, input.rightGripPosition, input.rightGripOrientation,
+		updateCube(_rightControllerObject, input.rightGripPosition, input.rightGripOrientation,
 				   input.rightGripPoseActive, rightControllerScale_, rightTouchingObject_,
 				   1, fe::OpenXR::Hand::Right);
 
@@ -1328,9 +1328,9 @@ private:
 
 	std::unique_ptr<fe::Drone> drone_;
 
-	std::shared_ptr<fe::Object> leftControllerObject_;
-	std::shared_ptr<fe::Object> rightControllerObject_;
-	std::shared_ptr<fe::Object> ballObject_;
+	std::shared_ptr<fe::Object> _leftControllerObject;
+	std::shared_ptr<fe::Object> _rightControllerObject;
+	std::shared_ptr<fe::Object> _ballObject;
 	std::vector<std::shared_ptr<fe::Object>> grabbableObjects_;
 	float ballRadius_ = 0.25f;
 	float leftControllerScale_ = 1.0f;
