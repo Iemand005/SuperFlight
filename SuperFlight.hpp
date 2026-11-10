@@ -225,7 +225,7 @@ public:
 		}
 
 		scene->AddObject(_ballObject);
-		grabbableObjects_.push_back(_ballObject);
+		_grabbableObjects.push_back(_ballObject);
 	}
 
 	void HandleXRSpawning()
@@ -265,7 +265,7 @@ public:
 		sphere->SetPhysicsObject(std::move(body));
 
 		scene->AddObject(sphere);
-		grabbableObjects_.push_back(sphere);
+		_grabbableObjects.push_back(sphere);
 
 		GetOpenXR().TriggerHaptic(fe::OpenXR::Hand::Left, 0.5f, 0.08f);
 	}
@@ -330,7 +330,7 @@ public:
 		auto findTouched = [&](const glm::vec3& gripPos, float scale) -> std::shared_ptr<fe::Object> {
 			std::shared_ptr<fe::Object> best;
 			float bestDist = std::numeric_limits<float>::max();
-			for (const auto& obj : grabbableObjects_)
+			for (const auto& obj : _grabbableObjects)
 			{
 				if (!obj)
 					continue;
@@ -1200,14 +1200,15 @@ public:
 				else
 					ImGui::TextDisabled("%s: up", label);
 			};
-			heldLine("X (left, spawn)", GetOpenXR().IsButtonHeld(fe::OpenXR::Button::X));
-			heldLine("Y (left)", GetOpenXR().IsButtonHeld(fe::OpenXR::Button::Y));
-			heldLine("A (right)", GetOpenXR().IsButtonHeld(fe::OpenXR::Button::A));
-			heldLine("B (right)", GetOpenXR().IsButtonHeld(fe::OpenXR::Button::B));
-			heldLine("Left trigger", GetOpenXR().IsButtonHeld(fe::OpenXR::Button::LeftTrigger));
-			heldLine("Right trigger", GetOpenXR().IsButtonHeld(fe::OpenXR::Button::RightTrigger));
-			heldLine("Left squeeze (grip)", GetOpenXR().IsGripPressed(fe::OpenXR::Hand::Left));
-			heldLine("Right squeeze (grip)", GetOpenXR().IsGripPressed(fe::OpenXR::Hand::Right));
+			const auto &openXR = GetOpenXR();
+			heldLine("X (left, spawn)", openXR.IsButtonHeld(fe::OpenXR::Button::X));
+			heldLine("Y (left)", openXR.IsButtonHeld(fe::OpenXR::Button::Y));
+			heldLine("A (right)", openXR.IsButtonHeld(fe::OpenXR::Button::A));
+			heldLine("B (right)", openXR.IsButtonHeld(fe::OpenXR::Button::B));
+			heldLine("Left trigger", openXR.IsButtonHeld(fe::OpenXR::Button::LeftTrigger));
+			heldLine("Right trigger", openXR.IsButtonHeld(fe::OpenXR::Button::RightTrigger));
+			heldLine("Left squeeze (grip)", openXR.IsGripPressed(fe::OpenXR::Hand::Left));
+			heldLine("Right squeeze (grip)", openXR.IsGripPressed(fe::OpenXR::Hand::Right));
 			ImGui::Text("Holding: %s (%s)",
 				grabbedObject_ ? grabbedObject_->name.c_str() : "none",
 				grabbedHand_ < 0 ? "-" : (grabbedHand_ == 0 ? "left" : "right"));
@@ -1333,7 +1334,7 @@ private:
 	std::shared_ptr<fe::Object> _leftControllerObject;
 	std::shared_ptr<fe::Object> _rightControllerObject;
 	std::shared_ptr<fe::Object> _ballObject;
-	std::vector<std::shared_ptr<fe::Object>> grabbableObjects_;
+	std::vector<std::shared_ptr<fe::Object>> _grabbableObjects;
 	float ballRadius_ = 0.25f;
 	float leftControllerScale_ = 1.0f;
 	float rightControllerScale_ = 1.0f;
