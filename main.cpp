@@ -29,7 +29,7 @@ int main(int argc, char* argv[]) {
 #ifdef SUPERFLIGHT_USE_VULKAN
 		options.useVulkan = true;
 #else
-		options.useVulkan = TRUE;
+		options.useVulkan = false;
 #endif
 #ifdef __ANDROID__
 		fe::AndroidSetupAssets("resources");

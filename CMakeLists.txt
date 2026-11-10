@@ -21,7 +21,7 @@ set(KISSFFT_STATIC ON CACHE BOOL "Build static library" FORCE)
 
 set(FE_EXCLUDE_JOLT OFF CACHE BOOL "Disable JOLT" FORCE)
 
-option(SUPERFLIGHT_USE_VULKAN "Use Vulkan for SuperFlight rendering" OFF)
+option(SUPERFLIGHT_USE_VULKAN "Use Vulkan for SuperFlight rendering" ON)
 
 set(ENGINE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../FenixEngine")
 
