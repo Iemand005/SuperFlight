@@ -11,14 +11,39 @@
 #endif
 
 #include <exception>
+#include <sstream>
 
 #include "Log.hpp"
 #ifdef __ANDROID__
 #include "Android.hpp"
 #endif
 
-int main(int argc, char* argv[]) {
+namespace {
 
+bool DefaultUseVulkan()
+{
+#ifdef SUPERFLIGHT_USE_VULKAN
+	return true;
+#else
+	return false;
+#endif
+}
+
+void ApplyRendererArguments(bool& useVulkan, const char* arguments)
+{
+	std::istringstream stream(arguments ? arguments : "");
+	std::string argument;
+	while (stream >> argument)
+	{
+		if (argument == "--vulkan")
+			useVulkan = true;
+		else if (argument == "--opengl")
+			useVulkan = false;
+	}
+}
+
+int RunGame(bool useVulkan)
+{
 	fe::LogSetTag("SuperFlight");
 	fe::Log("SuperFlight starting");
 
@@ -26,11 +51,7 @@ int main(int argc, char* argv[]) {
 		fe::LogToFile("Creating SuperFlight game instance...");
 
 		fe::XRGameOptions options(1200, 800);
-#ifdef SUPERFLIGHT_USE_VULKAN
-		options.useVulkan = true;
-#else
-		options.useVulkan = false;
-#endif
+		options.useVulkan = useVulkan;
 #ifdef __ANDROID__
 		fe::AndroidSetupAssets("resources");
 		options.launchVR = true;
@@ -51,10 +72,21 @@ int main(int argc, char* argv[]) {
 	return 0;
 }
 
+}
+
+int main(int argc, char* argv[]) {
+	bool useVulkan = DefaultUseVulkan();
+	for (int i = 1; i < argc; ++i)
+		ApplyRendererArguments(useVulkan, argv[i]);
+	return RunGame(useVulkan);
+}
+
 #ifdef _WIN32
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR lpCmdLine, int) {
-	return main(0, nullptr);
+	bool useVulkan = DefaultUseVulkan();
+	ApplyRendererArguments(useVulkan, lpCmdLine);
+	return RunGame(useVulkan);
 }
 
 #endif
