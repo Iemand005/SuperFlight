@@ -318,10 +318,10 @@ public:
 
 		updateHandMotion(input.leftGripPosition, input.leftGripOrientation, input.leftGripPoseActive,
 						 prevLeftGripPosition_, prevLeftGripOrientation_, hasPrevLeftGrip_,
-						 leftGripVelocity_, leftGripAngularVelocity_);
+						 leftGripVelocity_, _leftGripAngularVelocity);
 		updateHandMotion(input.rightGripPosition, input.rightGripOrientation, input.rightGripPoseActive,
 						 prevRightGripPosition_, prevRightGripOrientation_, hasPrevRightGrip_,
-						 rightGripVelocity_, rightGripAngularVelocity_);
+						 _rightGripVelocity, _rightGripAngularVelocity);
 
 		// Nearest grabbable sphere within reach of a hand.
 		auto findTouched = [&](const glm::vec3& gripPos, float scale) -> std::shared_ptr<fe::Object> {
@@ -438,7 +438,7 @@ public:
 		_grabbedHand = handIndex;
 		_grabLocalOffset = invHand * (obj->state.position - handPos);
 		_grabLocalRotation = invHand * obj->state.orientation;
-		grabWasStatic_ = obj->isStatic;
+		_grabWasStatic = obj->isStatic;
 		obj->isStatic = true;
 
 		GetOpenXR().TriggerHaptic(handIndex == 0 ? fe::OpenXR::Hand::Left : fe::OpenXR::Hand::Right,
@@ -456,14 +456,15 @@ public:
 			_grabbedObject->physicsObject->SetRotation(_grabbedObject->state.orientation);
 
 			// Carry the hand's momentum into the object so it can be thrown.
-			glm::vec3 throwVelocity = _grabbedHand == 0 ? leftGripVelocity_ : rightGripVelocity_;
+			// TODO make sure the like hand velocity is maybe uh integrated or like averaged from the past x amount of frames? might help low pass filter the shaky hand motions for more consistent throwing control
+			glm::vec3 throwVelocity = _grabbedHand == 0 ? leftGripVelocity_ : _rightGripVelocity;
 			throwVelocity *= 2.5f;
 			const float maxThrowSpeed = 45.0f;
 			const float throwSpeed = glm::length(throwVelocity);
 			if (throwSpeed > maxThrowSpeed)
 				throwVelocity = throwVelocity / throwSpeed * maxThrowSpeed;
 
-			glm::vec3 spin = _grabbedHand == 0 ? leftGripAngularVelocity_ : rightGripAngularVelocity_;
+			glm::vec3 spin = _grabbedHand == 0 ? _leftGripAngularVelocity : _rightGripAngularVelocity;
 			const float maxSpin = 30.0f;
 			const float spinLength = glm::length(spin);
 			if (spinLength > maxSpin)
@@ -472,7 +473,7 @@ public:
 			_grabbedObject->physicsObject->SetLinearVelocity(throwVelocity);
 			_grabbedObject->physicsObject->SetAngularVelocity(spin);
 		}
-		_grabbedObject->isStatic = grabWasStatic_;
+		_grabbedObject->isStatic = _grabWasStatic;
 		_grabbedObject.reset();
 		_grabbedHand = -1;
 	}
@@ -1339,7 +1340,7 @@ private:
 	int _grabbedHand = -1;
 	glm::vec3 _grabLocalOffset{0.0f};
 	glm::quat _grabLocalRotation{1.0f, 0.0f, 0.0f, 0.0f};
-	bool grabWasStatic_ = false;
+	bool _grabWasStatic = false;
 
 	glm::vec3 prevLeftGripPosition_{0.0f};
 	glm::vec3 prevRightGripPosition_{0.0f};
@@ -1348,9 +1349,9 @@ private:
 	bool hasPrevLeftGrip_ = false;
 	bool hasPrevRightGrip_ = false;
 	glm::vec3 leftGripVelocity_{0.0f};
-	glm::vec3 rightGripVelocity_{0.0f};
-	glm::vec3 leftGripAngularVelocity_{0.0f};
-	glm::vec3 rightGripAngularVelocity_{0.0f};
+	glm::vec3 _rightGripVelocity{0.0f};
+	glm::vec3 _leftGripAngularVelocity{0.0f};
+	glm::vec3 _rightGripAngularVelocity{0.0f};
 
 	float airplaneThrottle = 0.0f;
 	float airplaneAirSpeed = 0.0f;
