@@ -38,9 +38,12 @@ public:
 #if defined(__ANDROID__)
 		LoadShaders("resources/shaders/VertexShader_gles300.glsl",
 			"resources/shaders/FragmentShader_gles300.glsl");
-#elif !defined(SUPERFLIGHT_USE_VULKAN)
-		LoadShaders("resources/shaders/VertexShader_gl330.glsl",
-			"resources/shaders/FragmentShader_gl330.glsl");
+#else
+		if (!options.useVulkan)
+		{
+			LoadShaders("resources/shaders/VertexShader_gl330.glsl",
+				"resources/shaders/FragmentShader_gl330.glsl");
+		}
 #endif
 
 #ifdef FE_HAS_VULKAN
