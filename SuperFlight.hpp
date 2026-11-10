@@ -360,7 +360,7 @@ public:
 			cube->SetPosition(gripPos);
 			cube->SetOrientation(gripOrientation);
 
-			const bool holdingThis = grabbedObject_ && grabbedHand_ == handIndex;
+			const bool holdingThis = _grabbedObject && _grabbedHand == handIndex;
 			const bool hit = findTouched(gripPos, scale) != nullptr || holdingThis;
 
 			if (hit && !holdingThis)
@@ -388,29 +388,27 @@ public:
 		const bool leftGrip = GetOpenXR().IsGripPressed(fe::OpenXR::Hand::Left);
 		const bool rightGrip = GetOpenXR().IsGripPressed(fe::OpenXR::Hand::Right);
 
-		if (grabbedObject_)
+		if (_grabbedObject)
 		{
-			const bool handGrip = grabbedHand_ == 0 ? leftGrip : rightGrip;
-			const bool poseActive = grabbedHand_ == 0 ? input.leftGripPoseActive : input.rightGripPoseActive;
+			const bool handGrip = _grabbedHand == 0 ? leftGrip : rightGrip;
+			const bool poseActive = _grabbedHand == 0 ? input.leftGripPoseActive : input.rightGripPoseActive;
 			if (!handGrip || !poseActive)
 			{
 				ReleaseGrabbedObject();
 			}
 			else
 			{
-				// Rigidly attach to the hand: the offset is stored in hand-local
-				// space, so moving and rotating the hand moves and rotates the
-				// object around the grip point.
-				const glm::vec3 handPos = grabbedHand_ == 0 ? input.leftGripPosition : input.rightGripPosition;
-				const glm::quat handRot = grabbedHand_ == 0 ? input.leftGripOrientation : input.rightGripOrientation;
-				const glm::vec3 targetPos = handPos + handRot * grabLocalOffset_;
-				const glm::quat targetRot = handRot * grabLocalRotation_;
-				grabbedObject_->SetPosition(targetPos);
-				grabbedObject_->SetOrientation(targetRot);
-				if (grabbedObject_->physicsObject)
+				// Rigidly attach to the hand: store the ffset in hand-local space, so moving and rotating the hand moves and rotates the object around the grip point.
+				const glm::vec3 handPos = _grabbedHand == 0 ? input.leftGripPosition : input.rightGripPosition;
+				const glm::quat handRot = _grabbedHand == 0 ? input.leftGripOrientation : input.rightGripOrientation;
+				const glm::vec3 targetPos = handPos + handRot * _grabLocalOffset;
+				const glm::quat targetRot = handRot * _grabLocalRotation;
+				_grabbedObject->SetPosition(targetPos);
+				_grabbedObject->SetOrientation(targetRot);
+				if (_grabbedObject->physicsObject)
 				{
-					grabbedObject_->physicsObject->SetPosition(targetPos);
-					grabbedObject_->physicsObject->SetRotation(targetRot);
+					_grabbedObject->physicsObject->SetPosition(targetPos);
+					_grabbedObject->physicsObject->SetRotation(targetRot);
 				}
 			}
 			return;
@@ -436,10 +434,10 @@ public:
 			return;
 
 		const glm::quat invHand = glm::inverse(handRot);
-		grabbedObject_ = obj;
-		grabbedHand_ = handIndex;
-		grabLocalOffset_ = invHand * (obj->state.position - handPos);
-		grabLocalRotation_ = invHand * obj->state.orientation;
+		_grabbedObject = obj;
+		_grabbedHand = handIndex;
+		_grabLocalOffset = invHand * (obj->state.position - handPos);
+		_grabLocalRotation = invHand * obj->state.orientation;
 		grabWasStatic_ = obj->isStatic;
 		obj->isStatic = true;
 
@@ -449,34 +447,34 @@ public:
 
 	void ReleaseGrabbedObject()
 	{
-		if (!grabbedObject_)
+		if (!_grabbedObject)
 			return;
 
-		if (grabbedObject_->physicsObject)
+		if (_grabbedObject->physicsObject)
 		{
-			grabbedObject_->physicsObject->SetPosition(grabbedObject_->state.position);
-			grabbedObject_->physicsObject->SetRotation(grabbedObject_->state.orientation);
+			_grabbedObject->physicsObject->SetPosition(_grabbedObject->state.position);
+			_grabbedObject->physicsObject->SetRotation(_grabbedObject->state.orientation);
 
 			// Carry the hand's momentum into the object so it can be thrown.
-			glm::vec3 throwVelocity = grabbedHand_ == 0 ? leftGripVelocity_ : rightGripVelocity_;
+			glm::vec3 throwVelocity = _grabbedHand == 0 ? leftGripVelocity_ : rightGripVelocity_;
 			throwVelocity *= 2.5f;
 			const float maxThrowSpeed = 45.0f;
 			const float throwSpeed = glm::length(throwVelocity);
 			if (throwSpeed > maxThrowSpeed)
 				throwVelocity = throwVelocity / throwSpeed * maxThrowSpeed;
 
-			glm::vec3 spin = grabbedHand_ == 0 ? leftGripAngularVelocity_ : rightGripAngularVelocity_;
+			glm::vec3 spin = _grabbedHand == 0 ? leftGripAngularVelocity_ : rightGripAngularVelocity_;
 			const float maxSpin = 30.0f;
 			const float spinLength = glm::length(spin);
 			if (spinLength > maxSpin)
 				spin = spin / spinLength * maxSpin;
 
-			grabbedObject_->physicsObject->SetLinearVelocity(throwVelocity);
-			grabbedObject_->physicsObject->SetAngularVelocity(spin);
+			_grabbedObject->physicsObject->SetLinearVelocity(throwVelocity);
+			_grabbedObject->physicsObject->SetAngularVelocity(spin);
 		}
-		grabbedObject_->isStatic = grabWasStatic_;
-		grabbedObject_.reset();
-		grabbedHand_ = -1;
+		_grabbedObject->isStatic = grabWasStatic_;
+		_grabbedObject.reset();
+		_grabbedHand = -1;
 	}
 
 	void RebuildPlayerPhysicsBody()
@@ -1207,8 +1205,8 @@ public:
 			heldLine("Left squeeze (grip)", openXR.IsGripPressed(fe::OpenXR::Hand::Left));
 			heldLine("Right squeeze (grip)", openXR.IsGripPressed(fe::OpenXR::Hand::Right));
 			ImGui::Text("Holding: %s (%s)",
-				grabbedObject_ ? grabbedObject_->name.c_str() : "none",
-				grabbedHand_ < 0 ? "-" : (grabbedHand_ == 0 ? "left" : "right"));
+				_grabbedObject ? _grabbedObject->name.c_str() : "none",
+				_grabbedHand < 0 ? "-" : (_grabbedHand == 0 ? "left" : "right"));
 			ImGui::End();
 		}
 
@@ -1337,10 +1335,10 @@ private:
 	float rightControllerScale_ = 1.0f;
 	bool leftTouchingObject_ = false;
 	bool rightTouchingObject_ = false;
-	std::shared_ptr<fe::Object> grabbedObject_;
-	int grabbedHand_ = -1;
-	glm::vec3 grabLocalOffset_{0.0f};
-	glm::quat grabLocalRotation_{1.0f, 0.0f, 0.0f, 0.0f};
+	std::shared_ptr<fe::Object> _grabbedObject;
+	int _grabbedHand = -1;
+	glm::vec3 _grabLocalOffset{0.0f};
+	glm::quat _grabLocalRotation{1.0f, 0.0f, 0.0f, 0.0f};
 	bool grabWasStatic_ = false;
 
 	glm::vec3 prevLeftGripPosition_{0.0f};
