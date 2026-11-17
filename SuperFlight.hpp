@@ -968,11 +968,7 @@ public:
 		if (showXR)
 			DrawXRUI();
 		if (showDebugUI)
-		{
 			DrawDebugUI();
-			EndFrame();
-			return;
-		}
 
 		fe::EditableGame::DrawDebugUI();
 
