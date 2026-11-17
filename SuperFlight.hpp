@@ -180,30 +180,70 @@ public:
 					laneCenter + glm::vec3(7.4f, 30.4f, 0.0f));
 	}
 
+	std::shared_ptr<fe::Object> CreateDebugCube(const std::string& name, const glm::vec3& color, float size)
+	{
+		auto cube = std::make_shared<fe::Object>(fe::Primitives::GenerateCube(size));
+		cube->name = name;
+		cube->color = color;
+		cube->isStatic = true;
+		cube->visible = false;
+		scene->AddObject(cube);
+		return cube;
+	}
+
 	void CreateControllerCubes()
 	{
 		const fe::OpenXR::InputState input = GetWorldInputState();
-		
-		// _leftControllerObject = std::make_shared<fe::Object>(fe::Primitives::GenerateCube(
-		// 	{fe::PlaneDirection::Front, fe::PlaneDirection::Back,
-		// 	 fe::PlaneDirection::Left, fe::PlaneDirection::Right,
-		// 	 fe::PlaneDirection::Top, fe::PlaneDirection::Bottom},
-		// 	0.08f));
-		_leftControllerObject = std::make_shared<fe::Object>(fe::Primitives::GenerateCube(0.08f));
-		_leftControllerObject->name = "LeftController";
-		_leftControllerObject->color = {0.2f, 0.8f, 1.0f};
-		_leftControllerObject->state.position = playerSpawn + glm::vec3(-0.25f, 1.2f, -0.3f);
-		_leftControllerObject->isStatic = true;
-		_leftControllerObject->visible = input.leftGripPoseActive;
-		scene->AddObject(_leftControllerObject);
 
-		_rightControllerObject = std::make_shared<fe::Object>(fe::Primitives::GenerateCube(0.08f));
-		_rightControllerObject->name = "RightController";
-		_rightControllerObject->color = glm::vec3(1.0f, 0.5f, 0.1f);
+		_leftControllerObject = CreateDebugCube("LeftController", {0.2f, 0.8f, 1.0f}, 0.08f);
+		_leftControllerObject->state.position = playerSpawn + glm::vec3(-0.25f, 1.2f, -0.3f);
+		_leftControllerObject->visible = input.leftGripPoseActive;
+
+		_rightControllerObject = CreateDebugCube("RightController", {1.0f, 0.5f, 0.1f}, 0.08f);
 		_rightControllerObject->state.position = playerSpawn + glm::vec3(0.25f, 1.2f, -0.3f);
-		_rightControllerObject->isStatic = true;
 		_rightControllerObject->visible = input.rightGripPoseActive;
-		scene->AddObject(_rightControllerObject);
+	}
+
+	void CreateHandJointCubes()
+	{
+		constexpr size_t jointCount = static_cast<size_t>(fe::OpenXR::HandJoint::Count);
+		_handJointCubes.reserve(jointCount * 2);
+
+		const glm::vec3 colors[2] = {{0.2f, 0.8f, 1.0f}, {1.0f, 0.5f, 0.1f}};
+		const char* handNames[2] = {"Left", "Right"};
+		for (size_t hand = 0; hand < 2; ++hand)
+		{
+			for (size_t joint = 0; joint < jointCount; ++joint)
+			{
+				_handJointCubes.push_back(CreateDebugCube(
+					std::string(handNames[hand]) + "HandJoint" + std::to_string(joint),
+					colors[hand], 0.012f));
+			}
+		}
+	}
+
+	void UpdateHandJointCubes(const fe::OpenXR::InputState& input)
+	{
+		if (_handJointCubes.empty() && GetOpenXR().IsHandTrackingSupported())
+			CreateHandJointCubes();
+		if (_handJointCubes.empty())
+			return;
+
+		constexpr size_t jointCount = static_cast<size_t>(fe::OpenXR::HandJoint::Count);
+		const fe::OpenXR::HandState* hands[2] = {&input.leftHand, &input.rightHand};
+		for (size_t hand = 0; hand < 2; ++hand)
+		{
+			for (size_t joint = 0; joint < jointCount; ++joint)
+			{
+				auto& cube = _handJointCubes[hand * jointCount + joint];
+				const auto& pose = hands[hand]->joints[joint];
+				cube->visible = hands[hand]->active && pose.active;
+				if (!cube->visible)
+					continue;
+				cube->SetPosition(pose.position);
+				cube->SetOrientation(pose.orientation);
+			}
+		}
 	}
 
 	void CreateBall()
@@ -275,6 +315,8 @@ public:
 	void UpdateControllerCubes(float dt)
 	{
 		const fe::OpenXR::InputState input = GetWorldInputState();
+		UpdateHandJointCubes(input);
+
 		const float baseScale = 1.0f;
 		const float growRate = 0.2f;
 		const float shrinkRate = 0.5f;
@@ -1331,6 +1373,7 @@ private:
 
 	std::shared_ptr<fe::Object> _leftControllerObject;
 	std::shared_ptr<fe::Object> _rightControllerObject;
+	std::vector<std::shared_ptr<fe::Object>> _handJointCubes;
 	std::shared_ptr<fe::Object> _ballObject;
 	std::vector<std::shared_ptr<fe::Object>> _grabbableObjects;
 	float _ballRadius = 0.25f;
