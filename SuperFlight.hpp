@@ -973,6 +973,9 @@ public:
 			EndFrame();
 			return;
 		}
+
+		fe::EditableGame::DrawDebugUI();
+
 		EndFrame();
 	}
 
@@ -1102,7 +1105,7 @@ private:
 
 	enum class Mode { Walking, Drone, Airplane };
 	Mode mode = Mode::Walking;
-	bool showDebugUI = true;
+	bool showDebugUI = false;
 
 	struct HandRig
 	{
