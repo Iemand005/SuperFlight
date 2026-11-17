@@ -189,42 +189,42 @@ public:
 
 	void CreateHandJointCubes()
 	{
-		constexpr size_t count = static_cast<size_t>(fe::OpenXR::HandJoint::Count);
-		handJointCubes_.reserve(count * 2);
-		const glm::vec3 colors[2] = {{0.2f, 0.8f, 1.0f}, {1.0f, 0.5f, 0.1f}};
-		const char *names[2] = {"Left", "Right"};
-		for (size_t hand = 0; hand < 2; ++hand)
-			for (size_t joint = 0; joint < count; ++joint)
-			{
-				auto cube = AddCube(
-					(std::string(names[hand]) + "HandJoint" + std::to_string(joint)).c_str(),
-					colors[hand], 0.012f, glm::vec3(0.0f));
-				cube->visible = false;
-				handJointCubes_.push_back(cube);
-			}
+		// constexpr size_t count = static_cast<size_t>(fe::OpenXR::HandJoint::Count);
+		// handJointCubes_.reserve(count * 2);
+		// const glm::vec3 colors[2] = {{0.2f, 0.8f, 1.0f}, {1.0f, 0.5f, 0.1f}};
+		// const char *names[2] = {"Left", "Right"};
+		// for (size_t hand = 0; hand < 2; ++hand)
+		// 	for (size_t joint = 0; joint < count; ++joint)
+		// 	{
+		// 		auto cube = AddCube(
+		// 			(std::string(names[hand]) + "HandJoint" + std::to_string(joint)).c_str(),
+		// 			colors[hand], 0.012f, glm::vec3(0.0f));
+		// 		cube->visible = false;
+		// 		handJointCubes_.push_back(cube);
+		// 	}
 	}
 
 	void UpdateHandJointCubes(const fe::OpenXR::InputState &input)
 	{
-		if (handJointCubes_.empty() && GetOpenXR().IsHandTrackingSupported())
-			CreateHandJointCubes();
-		if (handJointCubes_.empty())
-			return;
+		// if (handJointCubes_.empty() && GetOpenXR().IsHandTrackingSupported())
+		// 	CreateHandJointCubes();
+		// if (handJointCubes_.empty())
+		// 	return;
 
-		constexpr size_t count = static_cast<size_t>(fe::OpenXR::HandJoint::Count);
-		const fe::OpenXR::HandState *hands[2] = {&input.leftHand, &input.rightHand};
-		for (size_t hand = 0; hand < 2; ++hand)
-			for (size_t joint = 0; joint < count; ++joint)
-			{
-				auto &cube = handJointCubes_[hand * count + joint];
-				const auto &pose = hands[hand]->joints[joint];
-				cube->visible = hands[hand]->active && pose.active;
-				if (cube->visible)
-				{
-					cube->SetPosition(pose.position);
-					cube->SetOrientation(pose.orientation);
-				}
-			}
+		// constexpr size_t count = static_cast<size_t>(fe::OpenXR::HandJoint::Count);
+		// const fe::OpenXR::HandState *hands[2] = {&input.leftHand, &input.rightHand};
+		// for (size_t hand = 0; hand < 2; ++hand)
+		// 	for (size_t joint = 0; joint < count; ++joint)
+		// 	{
+		// 		auto &cube = handJointCubes_[hand * count + joint];
+		// 		const auto &pose = hands[hand]->joints[joint];
+		// 		cube->visible = hands[hand]->active && pose.active;
+		// 		if (cube->visible)
+		// 		{
+		// 			cube->SetPosition(pose.position);
+		// 			cube->SetOrientation(pose.orientation);
+		// 		}
+		// 	}
 	}
 
 	void CreateBall()
@@ -1102,7 +1102,7 @@ private:
 
 	enum class Mode { Walking, Drone, Airplane };
 	Mode mode = Mode::Walking;
-	bool showDebugUI = false;
+	bool showDebugUI = true;
 
 	struct HandRig
 	{
