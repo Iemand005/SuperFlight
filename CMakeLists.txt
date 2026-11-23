@@ -23,6 +23,10 @@ set(FE_EXCLUDE_JOLT OFF CACHE BOOL "Disable JOLT" FORCE)
 
 option(SUPERFLIGHT_USE_VULKAN "Use Vulkan for SuperFlight rendering" ON)
 
+if(EMSCRIPTEN)
+	set(SUPERFLIGHT_USE_VULKAN OFF CACHE BOOL "Use Vulkan for SuperFlight rendering" FORCE)
+endif()
+
 set(ENGINE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../FenixEngine")
 
 if(CMAKE_CONFIGURATION_TYPES)
@@ -82,7 +86,7 @@ target_include_directories(${SUPERFLIGHT_TARGET} PRIVATE
 	${ENGINE_DIR}/external/imgui
 	${ENGINE_DIR}/external/kissfft
 	${ENGINE_DIR}/external/SDL/include
-	${ENGINE_DIR}/src/Engine
+	${ENGINE_DIR}/src
 )
 
 target_link_libraries(${SUPERFLIGHT_TARGET} PRIVATE
@@ -104,7 +108,7 @@ if(SUPERFLIGHT_USE_VULKAN)
 endif()
 
 target_precompile_headers(${SUPERFLIGHT_TARGET} PRIVATE
-	"$<$<COMPILE_LANGUAGE:CXX>:${ENGINE_DIR}/src/Engine/pch.hpp>"
+	"$<$<COMPILE_LANGUAGE:CXX>:${ENGINE_DIR}/src/pch.hpp>"
 )
 
 if(NOT WIN32 AND NOT EMSCRIPTEN AND NOT ANDROID)

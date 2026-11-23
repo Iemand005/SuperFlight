@@ -49,8 +49,8 @@ public:
 #ifdef FE_HAS_VULKAN
 		if (options.useVulkan)
 		{
-			LoadArrayShaders("resources/shaders/VertexShader_vk_array.spv", "resources/shaders/FragmentShader_vk_array.spv");
-			LoadFoxcraftShaders("resources/shaders/VertexShader_vk_foxcraft.spv", "resources/shaders/FragmentShader_vk_array.spv");
+			LoadShaders<fe::VertexArray>("resources/shaders/VertexShader_vk_array.spv", "resources/shaders/FragmentShader_vk_array.spv");
+			LoadShaders<VoxelPackedVertex>("resources/shaders/VertexShader_vk_foxcraft.spv", "resources/shaders/FragmentShader_vk_array.spv");
 			chunkBatcher_ = std::make_unique<ChunkBatcher>(
 				static_cast<fe::VulkanDevice *>(renderDevice.get()),
 				ChunkMesher::BuildBlockTextureImages());
@@ -64,20 +64,20 @@ public:
 
 	void Init() override
 	{
-		auto *window = GetWindow<fe::SDLWindow>();
+		auto *window = getWindow<fe::SDLWindow>();
 		window->Show();
 		window->DisableVSync();
 		camera->SetAspect(window->width, window->height);
 		SetupWorld();
 		window->StartMouseCapture();
-		RefreshJoysticks();
+		refreshJoysticks();
 	}
 
 	void Step() override
 	{
 		ProcessInput();
 		const float dt = static_cast<float>(fpsCounter.deltaTime);
-		auto *window = GetWindow<fe::SDLWindow>();
+		auto *window = getWindow<fe::SDLWindow>();
 
 		switch (mode)
 		{
@@ -464,7 +464,7 @@ public:
 		if (physics && drone_ && drone_->IsSpawned() && drone_->Enter(*physics))
 		{
 			mode = Mode::Drone;
-			GetWindow<fe::SDLWindow>()->StartMouseCapture();
+			getWindow<fe::SDLWindow>()->StartMouseCapture();
 		}
 	}
 
@@ -495,7 +495,7 @@ public:
 		plane_.airSpeed = 0.0f;
 		plane_.gearDown = false;
 		SetAirplaneGear(true);
-		GetWindow<fe::SDLWindow>()->StartMouseCapture();
+		getWindow<fe::SDLWindow>()->StartMouseCapture();
 	}
 
 	void ExitVehicle()
@@ -702,7 +702,7 @@ public:
 
 	void TryEnterVehicleAtScreenCenter()
 	{
-		auto *window = GetWindow<fe::SDLWindow>();
+		auto *window = getWindow<fe::SDLWindow>();
 		if (!window)
 			return;
 		glm::vec3 origin, direction;
@@ -801,10 +801,10 @@ public:
 	void ProcessInput()
 	{
 		SDL_Event event;
-		auto *window = GetWindow<fe::SDLWindow>();
+		auto *window = getWindow<fe::SDLWindow>();
 		auto capture = [&] {
 			window->StartMouseCapture();
-			RefreshJoysticks();
+			refreshJoysticks();
 		};
 		auto look = [&](float dx, float dy) {
 			camera->yaw += dx * 0.1f;
@@ -956,9 +956,9 @@ public:
 		}
 	}
 
-	void InitUI() override {}
+	void initUI() override {}
 
-	void DrawUI() override
+	void drawUI() override
 	{
 		const bool showXR = IsInstanceValid();
 		if (!showDebugUI && !showXR)
